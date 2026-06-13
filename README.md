@@ -116,6 +116,8 @@ DEFAULT_TRIGGER  = 'your_trigger_word'
 |---|---|
 | [07_Cartoonify_Gradio.ipynb](model/notebooks/interface/07_Cartoonify_Gradio.ipynb) | Main app — working prototype |
 | [08_Cartoonify_Story_Gradio.ipynb](model/notebooks/interface/08_Cartoonify_Story_Gradio.ipynb) | Adds Gemini story-to-prompt layer |
+| [09_Cartoonify_Kontext_Gradio.ipynb](model/notebooks/interface/09_Cartoonify_Kontext_Gradio.ipynb) | Phase 3 primary — FLUX Kontext native image-to-image |
+| [10_Cartoonify_Canny_Gradio.ipynb](model/notebooks/interface/10_Cartoonify_Canny_Gradio.ipynb) | Phase 3 secondary — Canny edge map + ControlNet |
 | [06_Gradio_FLUX_Depth_LoRA.ipynb](model/notebooks/interface/06_Gradio_FLUX_Depth_LoRA.ipynb) | Predecessor: FLUX + depth + LoRA (no UI polish) |
 | [02_FLUX_LoRA_Train.ipynb](model/notebooks/lora-training/02_FLUX_LoRA_Train.ipynb) | LoRA fine-tuning |
 | [01_FLUX_LoRA_Preparation.ipynb](model/notebooks/lora-training/01_FLUX_LoRA_Preparation.ipynb) | Dataset preparation and caption structuring |
@@ -137,3 +139,5 @@ See [\_\_docs\_\_/PROPOSAL.md](__docs__/PROPOSAL.md) for the full design.
 - [Architecture](__docs__/ARCHITECTURE.md) — system components, notebook structure, runtime requirements
 - [Image Workflow](__docs__/IMAGE_WORKFLOW.md) — step-by-step pipeline walkthrough
 - [What's the Story? Proposal](__docs__/PROPOSAL.md) — Gemini prompt-builder design
+- [Phase 3 — Image-to-Image Approaches](__docs__/Phase3-Image-to-Image-Approaches.md) — approaches evaluated, decision rationale, what changed
+- [Canny Architecture](__docs__/Cartoonify-Canny-Architecture.md) — Canny edge map pipeline, thresholds, ControlNet call reference
