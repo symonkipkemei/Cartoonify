@@ -1,6 +1,6 @@
 # Cartoonify — System Architecture
 
-> Unified reference for all four Cartoonify notebooks.
+> Unified reference for all five Cartoonify notebooks.
 > One runtime, one LoRA, one Gradio pattern — three image-conditioning modes.
 
 ---
@@ -37,8 +37,9 @@ Google Colab Pro  (A100 GPU, 40 GB VRAM)
 | `02_Cartoonify_Gradio_Depth_Story.ipynb` | Depth | Depth-Anything-V2 | `FluxControlNetPipeline` | + Gemini story layer |
 | `03_Cartoonify_Gradio_Kontext.ipynb` | Kontext | None | `FluxKontextPipeline` | + Gemini story layer |
 | `04_Cartoonify_Gradio_Canny.ipynb` | Canny | OpenCV Canny edges | `FluxControlNetPipeline` | + Gemini story layer |
+| `05_Cartoonify_Gradio_Unified.ipynb` | All three | Mode-dependent | Mode-dependent | + Gemini (silent on generate) |
 
-All notebooks share the same LoRA, the same Gemini system prompt (02 onward), and the same Gradio UI layout. They differ only in what happens between image upload and the FLUX pipeline call.
+All notebooks share the same LoRA, the same Gemini system prompt (02 onward), and the same Gradio UI layout. They differ in what happens between image upload and the FLUX pipeline call. Notebook `05` combines all three modes in one interface with dynamic pipeline loading.
 
 ---
 
@@ -64,14 +65,16 @@ Every notebook follows the same cell sequence. Only the content of highlighted c
 
 ## Models Used Per Notebook
 
-| Model | `01` | `02` | `03` | `04` |
-|---|---|---|---|---|
-| `black-forest-labs/FLUX.1-dev` (~24 GB) | ✓ | ✓ | — | ✓ |
-| `black-forest-labs/FLUX.1-Kontext-dev` (~24 GB) | — | — | ✓ | — |
-| `Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0` (~4 GB) | ✓ | ✓ | — | ✓ |
-| `depth-anything/Depth-Anything-V2-Small-hf` (~300 MB) | ✓ | ✓ | — | — |
-| `gdo_cartoon.safetensors` (~600 MB, from Drive) | ✓ | ✓ | ✓ | ✓ |
-| `gemini-2.5-flash-lite` (remote API) | — | ✓ | ✓ | ✓ |
+| Model | `01` | `02` | `03` | `04` | `05` |
+|---|---|---|---|---|---|
+| `black-forest-labs/FLUX.1-dev` (~24 GB) | ✓ | ✓ | — | ✓ | ✓ (Scene/Portrait) |
+| `black-forest-labs/FLUX.1-Kontext-dev` (~24 GB) | — | — | ✓ | — | ✓ (Reimagine) |
+| `Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0` (~4 GB) | ✓ | ✓ | — | ✓ | ✓ (Scene/Portrait) |
+| `depth-anything/Depth-Anything-V2-Small-hf` (~300 MB) | ✓ | ✓ | — | — | ✓ (Scene only) |
+| `gdo_cartoon.safetensors` (~600 MB, from Drive) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `gemini-2.5-flash-lite` (remote API) | — | ✓ | ✓ | ✓ | ✓ |
+
+**Notebook 05 note:** Only one pipeline loads at a time. `load_pipeline(mode)` unloads the current pipeline before loading the new one — the models listed for `05` are never in VRAM simultaneously.
 
 **FLUX.1-dev vs FLUX.1-Kontext-dev:** Kontext is a fine-tune of the FLUX.1-dev transformer. LoRA weights trained on FLUX.1-dev apply to the same layer types in the Kontext transformer and load cleanly — no retraining required.
 
@@ -145,16 +148,17 @@ OUTPUT_DIR       = '/content/drive/MyDrive/cartoonify/outputs'
 
 **Mode-specific additions:**
 
-| Variable | `01` / `02` (Depth) | `03` (Kontext) | `04` (Canny) |
-|---|---|---|---|
-| `DEFAULT_GUIDANCE` | `3.5` | `2.5` | `3.5` |
-| `DEFAULT_CN_SCALE` | `0.8` | — | `0.7` |
-| `DEFAULT_CN_END` | — | — | `0.8` |
-| `CONTROLNET_MODEL` | Shakker-Labs/Union-Pro-2.0 | — | Shakker-Labs/Union-Pro-2.0 |
-| `DEPTH_MODEL` | Depth-Anything-V2-Small | — | — |
-| `BASE_MODEL` | FLUX.1-dev | FLUX.1-Kontext-dev | FLUX.1-dev |
-| `DEFAULT_CANNY_LOW` | — | — | `50` |
-| `DEFAULT_CANNY_HIGH` | — | — | `200` |
+| Variable | `01` / `02` (Depth) | `03` (Kontext) | `04` (Canny) | `05` (Unified) |
+|---|---|---|---|---|
+| `DEFAULT_GUIDANCE` | `3.5` | `2.5` | `3.5` | Per mode via `DEFAULTS` dict |
+| `DEFAULT_CN_SCALE` | `0.8` | — | `0.7` | Per mode via `DEFAULTS` dict |
+| `DEFAULT_CN_END` | — | — | `0.8` | Per mode via `DEFAULTS` dict |
+| `CONTROLNET_MODEL` | Shakker-Labs/Union-Pro-2.0 | — | Shakker-Labs/Union-Pro-2.0 | Shakker-Labs/Union-Pro-2.0 |
+| `DEPTH_MODEL` | Depth-Anything-V2-Small | — | — | Depth-Anything-V2-Small |
+| `BASE_MODEL` | FLUX.1-dev | FLUX.1-Kontext-dev | FLUX.1-dev | Both (mode-dependent) |
+| `DEFAULT_CANNY_LOW` | — | — | `50` | Per mode via `DEFAULTS` dict |
+| `DEFAULT_CANNY_HIGH` | — | — | `200` | Per mode via `DEFAULTS` dict |
+| `DEFAULT_MODE` | — | — | — | `'Reimagine'` |
 
 ---
 
@@ -177,14 +181,16 @@ Every notebook uses the same two-column Gradio Blocks layout.
 
 **Mode differences in the UI:**
 
-| Element | `01` | `02` | `03` | `04` |
-|---|---|---|---|---|
-| Story accordion | — | ✓ | ✓ | ✓ |
-| Build Prompt button | — | ✓ | ✓ | ✓ |
-| ControlNet scale slider | ✓ | ✓ | — | ✓ |
-| Canny threshold sliders | — | — | — | ✓ (×2) |
-| ControlNet guidance end slider | — | — | — | ✓ |
-| Preprocessing preview panel | Depth map | Depth map | — | Canny edge map |
+| Element | `01` | `02` | `03` | `04` | `05` |
+|---|---|---|---|---|---|
+| Story accordion | — | ✓ | ✓ | ✓ | Always open (no accordion) |
+| Build Prompt button | — | ✓ | ✓ | ✓ | — (Gemini runs on generate) |
+| Mode selector | — | — | — | — | Three-pill radio (Reimagine / Scene / Portrait) |
+| ControlNet scale slider | ✓ | ✓ | — | ✓ | ✓ (hidden for Reimagine) |
+| Canny threshold sliders | — | — | — | ✓ (×2) | ✓ (Portrait only, ×2) |
+| ControlNet guidance end slider | — | — | — | ✓ | ✓ (Portrait only) |
+| Preprocessing preview panel | Depth map | Depth map | — | Canny edge map | — |
+| Processing log | — | — | — | — | ✓ (streaming narrative) |
 
 ---
 
@@ -222,10 +228,12 @@ The trigger word is also picked up by the Gemini system prompt automatically thr
 | VRAM — Depth mode (01/02) | ~38 GB after loading FLUX + ControlNet + Depth model + LoRA |
 | VRAM — Kontext mode (03) | ~30 GB after loading Kontext + LoRA |
 | VRAM — Canny mode (04) | ~38 GB after loading FLUX + ControlNet + LoRA |
+| VRAM — Unified (05) | One mode loaded at a time — same profiles as above |
 | First-run download — Depth/Canny | ~29 GB (FLUX.1-dev + ControlNet + Depth-Anything-V2) |
 | First-run download — Kontext | ~25 GB (FLUX.1-Kontext-dev + LoRA) |
 | Warm-cache load time | ~1 minute |
+| Mode switch time (05 only) | ~60–90 seconds |
 | Per-generation time | ~30–45 seconds at 28 steps |
 | Gemini latency | < 2 seconds (remote API, no GPU cost) |
 
-**Warm-cache note:** FLUX.1-dev + ControlNet-Union-Pro-2.0 weights are shared between notebooks 01, 02, and 04. If any of those notebooks have already run in the same Colab session, the weights load from cache instantly.
+**Warm-cache note:** FLUX.1-dev + ControlNet-Union-Pro-2.0 weights are shared between notebooks 01, 02, 04, and notebook 05 when running Scene or Portrait mode. If any of those notebooks have already run in the same Colab session, the weights load from cache instantly.
