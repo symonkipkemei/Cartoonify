@@ -33,12 +33,12 @@ Google Colab Pro  (A100 GPU, 40 GB VRAM)
 
 | Notebook | Mode | Preprocessing | Pipeline | Prompt-driven |
 |---|---|---|---|---|
-| `07_Cartoonify_Gradio.ipynb` | Depth | Depth-Anything-V2 | `FluxControlNetPipeline` | Manual prompt only |
-| `08_Cartoonify_Story_Gradio.ipynb` | Depth | Depth-Anything-V2 | `FluxControlNetPipeline` | + Gemini story layer |
-| `09_Cartoonify_Kontext_Gradio.ipynb` | Kontext | None | `FluxKontextPipeline` | + Gemini story layer |
-| `10_Cartoonify_Canny_Gradio.ipynb` | Canny | OpenCV Canny edges | `FluxControlNetPipeline` | + Gemini story layer |
+| `01_Cartoonify_Gradio_Depth.ipynb` | Depth | Depth-Anything-V2 | `FluxControlNetPipeline` | Manual prompt only |
+| `02_Cartoonify_Gradio_Depth_Story.ipynb` | Depth | Depth-Anything-V2 | `FluxControlNetPipeline` | + Gemini story layer |
+| `03_Cartoonify_Gradio_Kontext.ipynb` | Kontext | None | `FluxKontextPipeline` | + Gemini story layer |
+| `04_Cartoonify_Gradio_Canny.ipynb` | Canny | OpenCV Canny edges | `FluxControlNetPipeline` | + Gemini story layer |
 
-All notebooks share the same LoRA, the same Gemini system prompt (08 onward), and the same Gradio UI layout. They differ only in what happens between image upload and the FLUX pipeline call.
+All notebooks share the same LoRA, the same Gemini system prompt (02 onward), and the same Gradio UI layout. They differ only in what happens between image upload and the FLUX pipeline call.
 
 ---
 
@@ -49,14 +49,14 @@ Every notebook follows the same cell sequence. Only the content of highlighted c
 | Cell ID | Purpose | Varies per mode? |
 |---|---|---|
 | `cell-gpu` | `nvidia-smi` — confirm A100 | No |
-| `cell-install` | pip dependencies | Only in `10` (adds `opencv-python-headless`) |
+| `cell-install` | pip dependencies | Only in `04` (adds `opencv-python-headless`) |
 | `cell-restart` | `os.kill(os.getpid(), 9)` — kernel restart for clean package state | No |
 | `cell-imports` | torch, PIL, diffusers, gradio, google.genai | Pipeline class import differs |
 | `cell-drive` | Mount Google Drive; clear stale mountpoint | No |
 | `cell-token` | `HF_TOKEN` + `GOOGLE_API_KEY` from Colab Secrets | No |
 | `cell-config` | All mutable variables — LoRA, trigger word, defaults | Mode-specific parameters |
 | `cell-models` | Load pipeline + LoRA; apply PEFT torchao patch | Pipeline class differs |
-| `cell-gemini` | `GEMINI_SYSTEM_PROMPT` + `build_prompt_from_story()` | Absent in `07` |
+| `cell-gemini` | `GEMINI_SYSTEM_PROMPT` + `build_prompt_from_story()` | Absent in `01` |
 | `cell-inference` | `cartoonify()` — preprocessing + FLUX call + Drive save | Preprocessing differs |
 | `cell-ui` | Gradio Blocks UI + `demo.launch(share=True)` | Mode-specific controls |
 
@@ -64,7 +64,7 @@ Every notebook follows the same cell sequence. Only the content of highlighted c
 
 ## Models Used Per Notebook
 
-| Model | `07` | `08` | `09` | `10` |
+| Model | `01` | `02` | `03` | `04` |
 |---|---|---|---|---|
 | `black-forest-labs/FLUX.1-dev` (~24 GB) | ✓ | ✓ | — | ✓ |
 | `black-forest-labs/FLUX.1-Kontext-dev` (~24 GB) | — | — | ✓ | — |
@@ -73,11 +73,11 @@ Every notebook follows the same cell sequence. Only the content of highlighted c
 | `gdo_cartoon.safetensors` (~600 MB, from Drive) | ✓ | ✓ | ✓ | ✓ |
 | `gemini-2.5-flash-lite` (remote API) | — | ✓ | ✓ | ✓ |
 
-**FLUX.1-dev vs FLUX.1-Kontext-dev:** Kontext is a fine-tune of the FLUX.1-dev transformer. LoRA weights trained on FLUX.1-dev apply to the same layer types and load onto Kontext cleanly — no retraining required.
+**FLUX.1-dev vs FLUX.1-Kontext-dev:** Kontext is a fine-tune of the FLUX.1-dev transformer. LoRA weights trained on FLUX.1-dev apply to the same layer types in the Kontext transformer and load cleanly — no retraining required.
 
 **ControlNet mode codes** (ControlNet-Union-Pro-2.0):
-- `control_mode=2` — Depth (used in 07, 08)
-- `control_mode=0` — Canny (used in 10)
+- `control_mode=2` — Depth (used in 01, 02)
+- `control_mode=0` — Canny (used in 04)
 
 ---
 
@@ -104,7 +104,7 @@ The PEFT torchao patch is required because `peft` attempts to call `torchao` at 
 
 ## Shared: Gemini Story-to-Prompt Layer
 
-Notebooks 08, 09, and 10 all use the same `build_prompt_from_story()` function and the same `GEMINI_SYSTEM_PROMPT` constant (defined in `cell-gemini`). Nothing changes between versions.
+Notebooks 02, 03, and 04 all use the same `build_prompt_from_story()` function and the same `GEMINI_SYSTEM_PROMPT` constant (defined in `cell-gemini`). Nothing changes between versions.
 
 The function takes a plain-text story and returns a structured seven-layer prompt:
 
@@ -145,7 +145,7 @@ OUTPUT_DIR       = '/content/drive/MyDrive/cartoonify/outputs'
 
 **Mode-specific additions:**
 
-| Variable | `07` / `08` (Depth) | `09` (Kontext) | `10` (Canny) |
+| Variable | `01` / `02` (Depth) | `03` (Kontext) | `04` (Canny) |
 |---|---|---|---|
 | `DEFAULT_GUIDANCE` | `3.5` | `2.5` | `3.5` |
 | `DEFAULT_CN_SCALE` | `0.8` | — | `0.7` |
@@ -164,8 +164,8 @@ Every notebook uses the same two-column Gradio Blocks layout.
 
 **Left column (inputs, top to bottom):**
 1. Source image upload (drag-and-drop or clipboard)
-2. **What's the Story?** accordion — story textarea + **Build Prompt** button (08/09/10 only)
-3. `or write a prompt directly` divider (08/09/10 only)
+2. **What's the Story?** accordion — story textarea + **Build Prompt** button (02/03/04 only)
+3. `or write a prompt directly` divider (02/03/04 only)
 4. Style Prompt textbox
 5. LoRA Trigger Word textbox
 6. Advanced Controls accordion — guidance scale, steps, seed, plus mode-specific sliders
@@ -173,11 +173,11 @@ Every notebook uses the same two-column Gradio Blocks layout.
 
 **Right column (outputs):**
 - Cartoonified result (download button enabled)
-- Preprocessing preview in a collapsible accordion (depth map in 07/08; Canny edge map in 10; absent in 09)
+- Preprocessing preview in a collapsible accordion (depth map in 01/02; Canny edge map in 04; absent in 03)
 
 **Mode differences in the UI:**
 
-| Element | `07` | `08` | `09` | `10` |
+| Element | `01` | `02` | `03` | `04` |
 |---|---|---|---|---|
 | Story accordion | — | ✓ | ✓ | ✓ |
 | Build Prompt button | — | ✓ | ✓ | ✓ |
@@ -193,9 +193,9 @@ Every notebook uses the same two-column Gradio Blocks layout.
 | Secret name | Where to get it | Used by |
 |---|---|---|
 | `HF_TOKEN` | huggingface.co/settings/tokens (Read scope) | All notebooks — downloading gated FLUX weights |
-| `GOOGLE_API_KEY` | aistudio.google.com/apikey | 08, 09, 10 — Gemini story-to-prompt |
+| `GOOGLE_API_KEY` | aistudio.google.com/apikey | 02, 03, 04 — Gemini story-to-prompt |
 
-**FLUX.1-Kontext-dev licence:** The Kontext model (`09`) is gated separately from FLUX.1-dev. Accept the licence at `huggingface.co/black-forest-labs/FLUX.1-Kontext-dev` before running notebook 09.
+**FLUX.1-Kontext-dev licence:** The Kontext model (`03`) is gated separately from FLUX.1-dev. Accept the licence at `huggingface.co/black-forest-labs/FLUX.1-Kontext-dev` before running notebook 03.
 
 Both secrets are read via `google.colab.userdata.get()` — never hardcoded in the notebook.
 
@@ -219,13 +219,13 @@ The trigger word is also picked up by the Gemini system prompt automatically thr
 | Resource | Requirement |
 |---|---|
 | GPU | NVIDIA A100 40 GB (Google Colab Pro) |
-| VRAM — Depth mode (07/08) | ~38 GB after loading FLUX + ControlNet + Depth model + LoRA |
-| VRAM — Kontext mode (09) | ~30 GB after loading Kontext + LoRA |
-| VRAM — Canny mode (10) | ~38 GB after loading FLUX + ControlNet + LoRA |
+| VRAM — Depth mode (01/02) | ~38 GB after loading FLUX + ControlNet + Depth model + LoRA |
+| VRAM — Kontext mode (03) | ~30 GB after loading Kontext + LoRA |
+| VRAM — Canny mode (04) | ~38 GB after loading FLUX + ControlNet + LoRA |
 | First-run download — Depth/Canny | ~29 GB (FLUX.1-dev + ControlNet + Depth-Anything-V2) |
 | First-run download — Kontext | ~25 GB (FLUX.1-Kontext-dev + LoRA) |
 | Warm-cache load time | ~1 minute |
 | Per-generation time | ~30–45 seconds at 28 steps |
 | Gemini latency | < 2 seconds (remote API, no GPU cost) |
 
-**Warm-cache note:** FLUX.1-dev + ControlNet-Union-Pro-2.0 weights are shared between notebooks 07, 08, and 10. If any of those notebooks have already run in the same Colab session, the weights load from cache instantly.
+**Warm-cache note:** FLUX.1-dev + ControlNet-Union-Pro-2.0 weights are shared between notebooks 01, 02, and 04. If any of those notebooks have already run in the same Colab session, the weights load from cache instantly.

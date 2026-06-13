@@ -1,6 +1,6 @@
 # Cartoonify — Kontext Workflow
 
-> Notebook `09_Cartoonify_Kontext_Gradio.ipynb`
+> Notebook `03_Cartoonify_Gradio_Kontext.ipynb`
 > What happens between "upload a photo" and "download a cartoon" using FLUX Kontext.
 
 ---
@@ -33,7 +33,7 @@ No preprocessing step. The resized photo goes directly into the pipeline — no 
 
 ## Step 1 — Story to Prompt (Gemini)
 
-Identical to notebook 08. The user writes a plain-language description; Gemini converts it into the seven-layer structured prompt the LoRA was trained on.
+Identical to notebook 02. The user writes a plain-language description; Gemini converts it into the seven-layer structured prompt the LoRA was trained on.
 
 ```
 GEMINI_SYSTEM_PROMPT
@@ -174,7 +174,7 @@ The pipeline returns a **1024 × 1024 PIL Image**.
 
 ## Kontext vs Depth ControlNet
 
-| Question | Depth mode (07/08) | Kontext mode (09) |
+| Question | Depth mode (01/02) | Kontext mode (03) |
 |---|---|---|
 | How is the image used? | Depth proxy extracted; pixels discarded | Full image content read directly |
 | Are faces preserved? | Silhouette only | Yes — faces and identities understood |

@@ -1,6 +1,6 @@
 # Cartoonify — Canny ControlNet Workflow
 
-> Notebook `10_Cartoonify_Canny_Gradio.ipynb`
+> Notebook `04_Cartoonify_Gradio_Canny.ipynb`
 > What happens between "upload a photo" and "download a cartoon" using Canny edge detection.
 
 ---
@@ -36,7 +36,7 @@ User story (plain text)
 
 ## Step 1 — Story to Prompt (Gemini)
 
-Identical to notebooks 08 and 09. The user writes a plain-language description; Gemini converts it into the seven-layer structured prompt the LoRA was trained on.
+Identical to notebooks 02 and 03. The user writes a plain-language description; Gemini converts it into the seven-layer structured prompt the LoRA was trained on.
 
 ```
 GEMINI_SYSTEM_PROMPT
@@ -210,7 +210,7 @@ The pipeline returns a **1024 × 1024 PIL Image**.
 
 ## Canny vs Depth ControlNet
 
-| Question | Depth mode (07/08) | Canny mode (10) |
+| Question | Depth mode (01/02) | Canny mode (04) |
 |---|---|---|
 | What is extracted? | Near/far distance per pixel | Hard geometric edge lines |
 | What is preserved? | Spatial layout and proportions | Silhouettes, face contours, clothing folds |
@@ -222,7 +222,7 @@ The pipeline returns a **1024 × 1024 PIL Image**.
 
 ## Canny vs Kontext
 
-| Question | Kontext mode (09) | Canny mode (10) |
+| Question | Kontext mode (03) | Canny mode (04) |
 |---|---|---|
 | Preprocessing | None | cv2.Canny edge extraction |
 | Image constraint | Semantic (content understood) | Geometric (edge lines) |

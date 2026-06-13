@@ -1,30 +1,40 @@
 # Cartoonify
 
-Transforms any photo into a satirical editorial cartoon using a fine-tuned diffusion pipeline.
+Transforms any photo into a satirical editorial cartoon using fine-tuned diffusion pipelines.
 
-**Stack:** FLUX.1-dev · ControlNet Depth · custom LoRA · Gradio · Google Colab Pro (A100)
+**Stack:** FLUX.1-dev · ControlNet · FLUX.1-Kontext-dev · custom LoRA · Gemini 2.5 Flash Lite · Gradio · Google Colab Pro (A100)
 
 ---
 
 ## How it works
 
+Three conditioning modes — pick based on what you need:
+
 ```
-Photo upload
-    │
-    ▼
-Depth-Anything-V2  →  depth map (scene structure)
-    │
-    ▼
-FLUX.1-dev + ControlNet + LoRA  →  cartoon image
-    │
-    ▼
-1024×1024 PNG  →  Gradio UI + auto-save to Drive
+Photo upload  →  Resize to 1024 × 1024
+                          │
+          ┌───────────────┼───────────────┐
+          │               │               │
+    Depth map        (direct)       Canny edges
+  (Depth-Anything)                 (cv2.Canny)
+          │               │               │
+  FluxControlNet   FluxKontext    FluxControlNet
+   (mode=2)       Pipeline        (mode=0)
+          │               │               │
+          └───────────────┴───────────────┘
+                          │
+              LoRA  +  Structured Prompt
+                          │
+                  1024×1024 cartoon PNG
 ```
 
-The depth map locks the spatial composition; the LoRA applies the cartoon style; the prompt steers the mood and detail. None of these copy pixels from the source — FLUX generates from scratch, constrained by structure.
+| Mode | Notebook | Use when |
+|---|---|---|
+| **Depth** | `01` / `02` | Scene-heavy photos, landscapes, crowds |
+| **Kontext** | `03` | Portrait satire — subject must stay recognisable |
+| **Canny** | `04` | Tight caricature — follow source outlines closely |
 
-Full walkthrough: [\_\_docs\_\_/IMAGE_WORKFLOW.md](__docs__/IMAGE_WORKFLOW.md)  
-System architecture: [\_\_docs\_\_/ARCHITECTURE.md](__docs__/ARCHITECTURE.md)
+All modes use the same Gemini story-to-prompt layer (notebooks `02`–`04`).
 
 ---
 
@@ -34,26 +44,28 @@ System architecture: [\_\_docs\_\_/ARCHITECTURE.md](__docs__/ARCHITECTURE.md)
 Cartoonify/
 │
 ├── data/
-│   ├── images/              # 17 editorial cartoons used as training reference (CTN001–CTN0017)
+│   ├── images/              # 17 editorial cartoons — training reference (CTN001–CTN0017)
 │   └── captions/            # Cartoonify_FLUX_Captions.xlsx — structured prompt metadata
 │
-├── model/
-│   └── notebooks/
-│       ├── lora-training/   # LoRA preparation, training, and evaluation notebooks
-│       │   └── dataset_FLUX.1/   # 30 image+caption pairs (bof_aar_lacha trigger)
-│       ├── image-image/     # FLUX image-to-image experiments (Canny, Depth)
-│       ├── text-image/      # FLUX text-to-image experiments
-│       └── interface/       # Gradio UI notebooks
-│           └── 07_Cartoonify_Gradio.ipynb   ← main deliverable (working)
+├── notebooks/
+│   ├── cartoonify/          # Gradio interface notebooks
+│   │   ├── 01_Cartoonify_Gradio_Depth.ipynb        # Depth ControlNet — prompt only
+│   │   ├── 02_Cartoonify_Gradio_Depth_Story.ipynb  # Depth ControlNet + Gemini story layer
+│   │   ├── 03_Cartoonify_Gradio_Kontext.ipynb      # FLUX Kontext — semantic recomposition
+│   │   └── 04_Cartoonify_Gradio_Canny.ipynb        # Canny ControlNet — edge-based
+│   │
+│   └── lora-training/       # LoRA preparation and training
+│       ├── 01_FLUX_LoRA_Preparation.ipynb
+│       └── 02_FLUX_LoRA_Train.ipynb
 │
 ├── __docs__/                # Project documentation
-│   ├── ARCHITECTURE.md          # System components, notebook structure, runtime requirements
-│   ├── IMAGE_WORKFLOW.md        # Step-by-step data flow through the pipeline
-│   └── PROPOSAL.md              # "What's the Story?" — next phase proposal
+│   ├── Cartoonify-Gradio-Architecture.md           # Unified system architecture
+│   ├── Cartoonify-Depth ControlNet-Workflow.md     # Depth mode pipeline walkthrough
+│   ├── Cartoonify-Kontext-Image-Workflow.md        # Kontext mode pipeline walkthrough
+│   └── Cartoonify-Canny ControlNet Workflow.md     # Canny mode pipeline walkthrough
 │
-└── __sample__/              # Reference scaffolds
-    ├── EXECUTION_PROPOSAL.md    # Original proposal (source)
-    ├── IMAGE_WORKFLOW.md        # Original workflow doc (source)
+└── __sample__/              # Reference material
+    ├── google_colab/        # Upstream reference notebooks
     └── frontend/            # React/TypeScript UI scaffold (future use)
 ```
 
@@ -61,13 +73,13 @@ Cartoonify/
 
 ## Quickstart
 
-**Requires:** Google Colab Pro → Runtime → A100 GPU
+**Requires:** Google Colab Pro → Runtime → Change runtime type → **A100 GPU**
 
-1. Open [model/notebooks/interface/07_Cartoonify_Gradio.ipynb](model/notebooks/interface/07_Cartoonify_Gradio.ipynb) in Colab
+1. Open [notebooks/cartoonify/02_Cartoonify_Gradio_Depth_Story.ipynb](notebooks/cartoonify/02_Cartoonify_Gradio_Depth_Story.ipynb) in Colab
 2. Add `HF_TOKEN` and `GOOGLE_API_KEY` to Colab Secrets (left sidebar → key icon)
 3. Run all cells in order — first run downloads ~24 GB of model weights (~4 min)
 4. Open the public Gradio URL printed at the end of the last cell
-5. Drop a photo, hit **Cartoonify**
+5. Expand **What's the Story?** → write a story → click **Build Prompt** → upload a photo → **Cartoonify**
 
 Subsequent runs use the Colab model cache and load in ~1 minute.
 
@@ -90,7 +102,7 @@ dry wit | political commentary | ironic | sharp | deadpan,
 three figure layout | horizontal spread | frontal view | eye level | speech bubble top left
 ```
 
-Swapping the LoRA requires updating two variables in the config cell:
+Swapping the LoRA requires updating two variables in `cell-config` only:
 
 ```python
 LORA_DRIVE_PATH  = '/content/drive/MyDrive/cartoonify/...'
@@ -101,48 +113,36 @@ DEFAULT_TRIGGER  = 'your_trigger_word'
 
 ## Key parameters
 
-| Parameter | Default | Notes |
-|---|---|---|
-| Guidance Scale | 3.5 | FLUX sweet spot is 3–5 |
-| Inference Steps | 28 | 20–35 is a good range |
-| ControlNet Scale | 0.8 | Shakker-Labs recommended value |
-| Seed | 42 | Fix for reproducibility; change to explore |
+| Parameter | Depth (01/02) | Kontext (03) | Canny (04) |
+|---|---|---|---|
+| Guidance Scale | 3.5 | 2.5 | 3.5 |
+| Inference Steps | 28 | 28 | 28 |
+| ControlNet Scale | 0.8 | — | 0.7 |
+| ControlNet End | — | — | 0.8 |
+| Canny Low / High | — | — | 50 / 200 |
+| Seed | 42 | 42 | 42 |
 
 ---
 
 ## Notebooks reference
 
-| Notebook | Purpose |
-|---|---|
-| [07_Cartoonify_Gradio.ipynb](model/notebooks/interface/07_Cartoonify_Gradio.ipynb) | Main app — working prototype |
-| [08_Cartoonify_Story_Gradio.ipynb](model/notebooks/interface/08_Cartoonify_Story_Gradio.ipynb) | Adds Gemini story-to-prompt layer |
-| [09_Cartoonify_Kontext_Gradio.ipynb](model/notebooks/interface/09_Cartoonify_Kontext_Gradio.ipynb) | Phase 3 primary — FLUX Kontext native image-to-image |
-| [10_Cartoonify_Canny_Gradio.ipynb](model/notebooks/interface/10_Cartoonify_Canny_Gradio.ipynb) | Phase 3 secondary — Canny edge map + ControlNet |
-| [06_Gradio_FLUX_Depth_LoRA.ipynb](model/notebooks/interface/06_Gradio_FLUX_Depth_LoRA.ipynb) | Predecessor: FLUX + depth + LoRA (no UI polish) |
-| [02_FLUX_LoRA_Train.ipynb](model/notebooks/lora-training/02_FLUX_LoRA_Train.ipynb) | LoRA fine-tuning |
-| [01_FLUX_LoRA_Preparation.ipynb](model/notebooks/lora-training/01_FLUX_LoRA_Preparation.ipynb) | Dataset preparation and caption structuring |
-| [06_FLUX_Image-to-Image_3_Depth.ipynb](model/notebooks/image-image/06_FLUX_Image-to-Image_3_Depth.ipynb) | Depth ControlNet experiments |
-
----
-
-## What's next
-
-**Phase 4 — "What's the Story?"**
-A Gemini 2.5 Flash Lite layer that converts a plain-language story into a structured LoRA-aligned prompt. Users describe what they want in natural language; Gemini fills the seven caption layers automatically; the result pre-fills the prompt box for review before generation.
-
-See [\_\_docs\_\_/PROPOSAL.md](__docs__/PROPOSAL.md) for the full design.
+| Notebook | Mode | Description |
+|---|---|---|
+| [01_Cartoonify_Gradio_Depth.ipynb](notebooks/cartoonify/01_Cartoonify_Gradio_Depth.ipynb) | Depth | Baseline — manual prompt, no Gemini |
+| [02_Cartoonify_Gradio_Depth_Story.ipynb](notebooks/cartoonify/02_Cartoonify_Gradio_Depth_Story.ipynb) | Depth + Gemini | Story → Gemini → structured prompt → depth ControlNet |
+| [03_Cartoonify_Gradio_Kontext.ipynb](notebooks/cartoonify/03_Cartoonify_Gradio_Kontext.ipynb) | Kontext | Full image content → FluxKontextPipeline |
+| [04_Cartoonify_Gradio_Canny.ipynb](notebooks/cartoonify/04_Cartoonify_Gradio_Canny.ipynb) | Canny | cv2.Canny edges → FluxControlNetPipeline |
+| [01_FLUX_LoRA_Preparation.ipynb](notebooks/lora-training/01_FLUX_LoRA_Preparation.ipynb) | Training | Dataset preparation and caption structuring |
+| [02_FLUX_LoRA_Train.ipynb](notebooks/lora-training/02_FLUX_LoRA_Train.ipynb) | Training | LoRA fine-tuning |
 
 ---
 
 ## Documentation
 
-**Architecture (one doc — covers all four notebooks):**
-- [System Architecture](__docs__/Cartoonify-Gradio-Architecture.md) — shared components, notebook comparison, Gemini layer, LoRA loading, Gradio layout, runtime requirements
+**Architecture (shared across all notebooks):**
+- [System Architecture](__docs__/Cartoonify-Gradio-Architecture.md) — component comparison, Gemini layer, LoRA loading, Gradio layout, runtime requirements
 
-**Image Workflows (one per conditioning mode):**
-- [Depth ControlNet Workflow](__docs__/Cartoonify-Gradio-Image-Workflow.md) — notebooks 07/08 — Depth-Anything-V2 → FluxControlNetPipeline
-- [Kontext Workflow](__docs__/Cartoonify-Kontext-Image-Workflow.md) — notebook 09 — full image content → FluxKontextPipeline
-- [Canny ControlNet Workflow](__docs__/Cartoonify-Canny-Architecture.md) — notebook 10 — cv2.Canny edges → FluxControlNetPipeline
-
-**Decision rationale:**
-- [Phase 3 — Image-to-Image Approaches](__docs__/Phase3-Image-to-Image-Approaches.md) — why depth is limiting, what was evaluated, what was chosen
+**Image workflows (one per conditioning mode):**
+- [Depth ControlNet Workflow](__docs__/Cartoonify-Depth%20ControlNet-Workflow.md) — notebooks 01/02 — Depth-Anything-V2 → FluxControlNetPipeline
+- [Kontext Workflow](__docs__/Cartoonify-Kontext-Image-Workflow.md) — notebook 03 — full image content → FluxKontextPipeline
+- [Canny ControlNet Workflow](__docs__/Cartoonify-Canny%20ControlNet%20Workflow.md) — notebook 04 — cv2.Canny edges → FluxControlNetPipeline

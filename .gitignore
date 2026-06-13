@@ -390,3 +390,5 @@ FodyWeavers.xsd
 
 __sample__/
 *__sample__/*
+
+.claude

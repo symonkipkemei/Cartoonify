@@ -1,6 +1,6 @@
 # Cartoonify — Depth ControlNet Workflow
 
-> Notebooks `07_Cartoonify_Gradio.ipynb` and `08_Cartoonify_Story_Gradio.ipynb`
+> Notebooks `01_Cartoonify_Gradio_Depth.ipynb` and `02_Cartoonify_Gradio_Depth_Story.ipynb`
 > What happens between "upload a photo" and "download a cartoon" using Depth ControlNet.
 
 ---
@@ -8,7 +8,7 @@
 ## Pipeline Overview
 
 ```
-User story (plain text)              [08 only — skip to ③ in 07]
+User story (plain text)              [02 only — skip to ③ in 01]
     │
 ① Gemini 2.5 Flash Lite
     │  structured seven-layer prompt
@@ -30,11 +30,11 @@ User story (plain text)              [08 only — skip to ③ in 07]
 ⑥ 1024 × 1024 PNG  →  Gradio display + Drive auto-save
 ```
 
-Steps ①–② are present only in `08`. Step ③ onward is identical in both notebooks.
+Steps ①–② are present only in `02`. Step ③ onward is identical in both notebooks.
 
 ---
 
-## Step 1 — Story to Prompt (Gemini) `08 only`
+## Step 1 — Story to Prompt (Gemini) `02 only`
 
 The user writes a plain-language description of what they want to illustrate. Gemini converts it into a structured prompt aligned with the LoRA training vocabulary.
 
@@ -77,7 +77,7 @@ two-group layout | standing figure left | queue of figures right | speech bubble
 
 ---
 
-## Step 2 — User Reviews the Prompt `08 only`
+## Step 2 — User Reviews the Prompt `02 only`
 
 The structured prompt populates the **Style Prompt** textbox. The user can accept it, edit specific keywords, or discard it and write a prompt manually. The box is always editable — Gemini output is a starting point, not a locked value.
 
@@ -119,7 +119,7 @@ The raw output is normalised to 0–255 and converted to RGB (three identical ch
 | Near / far spatial relationships | Artistic style |
 | Overall compositional weight | Faces, expressions, body language |
 
-This is the key limitation of depth-based conditioning: expressions, gestures, and identity details — the elements that make political satire land — are stripped out. The cartoon output is recognisable through silhouette alone, not through content understanding. See Kontext mode (`09`) for the alternative.
+This is the key limitation of depth-based conditioning: expressions, gestures, and identity details — the elements that make political satire land — are stripped out. The cartoon output is recognisable through silhouette alone, not through content understanding. See Kontext mode (`03`) for the alternative.
 
 ---
 
