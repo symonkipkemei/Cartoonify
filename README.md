@@ -136,8 +136,13 @@ See [\_\_docs\_\_/PROPOSAL.md](__docs__/PROPOSAL.md) for the full design.
 
 ## Documentation
 
-- [Architecture](__docs__/ARCHITECTURE.md) — system components, notebook structure, runtime requirements
-- [Image Workflow](__docs__/IMAGE_WORKFLOW.md) — step-by-step pipeline walkthrough
-- [What's the Story? Proposal](__docs__/PROPOSAL.md) — Gemini prompt-builder design
-- [Phase 3 — Image-to-Image Approaches](__docs__/Phase3-Image-to-Image-Approaches.md) — approaches evaluated, decision rationale, what changed
-- [Canny Architecture](__docs__/Cartoonify-Canny-Architecture.md) — Canny edge map pipeline, thresholds, ControlNet call reference
+**Architecture (one doc — covers all four notebooks):**
+- [System Architecture](__docs__/Cartoonify-Gradio-Architecture.md) — shared components, notebook comparison, Gemini layer, LoRA loading, Gradio layout, runtime requirements
+
+**Image Workflows (one per conditioning mode):**
+- [Depth ControlNet Workflow](__docs__/Cartoonify-Gradio-Image-Workflow.md) — notebooks 07/08 — Depth-Anything-V2 → FluxControlNetPipeline
+- [Kontext Workflow](__docs__/Cartoonify-Kontext-Image-Workflow.md) — notebook 09 — full image content → FluxKontextPipeline
+- [Canny ControlNet Workflow](__docs__/Cartoonify-Canny-Architecture.md) — notebook 10 — cv2.Canny edges → FluxControlNetPipeline
+
+**Decision rationale:**
+- [Phase 3 — Image-to-Image Approaches](__docs__/Phase3-Image-to-Image-Approaches.md) — why depth is limiting, what was evaluated, what was chosen
