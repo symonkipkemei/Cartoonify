@@ -2,6 +2,7 @@
 
 > Notebook `05_Cartoonify_Gradio_Unified.ipynb`
 > One story. One button. Three rendering styles — all in a single interface.
+> Two settings modes: Default (hardcoded) and Wild (Gemini-suggested for maximum satirical impact).
 
 ---
 
@@ -112,65 +113,127 @@ def load_pipeline(mode: str) -> None:
 
 ---
 
-## Mode Selector Auto-Adjustments
+## Settings Modes — Default vs Wild
 
-When the user switches rendering style, `mode_selector.change` fires `update_mode()`, which:
+The Settings section (between the rendering style selector and Advanced Settings) has a two-option toggle:
 
-| Setting | What happens |
+| Mode | What happens |
 |---|---|
-| Guidance Scale | Resets to `2.5` (Reimagine) or `3.5` (Scene / Portrait) |
-| ControlNet Scale | Resets to mode default; hidden for Reimagine |
-| ControlNet Guidance End | Resets to `0.8`; visible only for Portrait |
-| Canny Low / High | Reset to `50` / `200`; visible only for Portrait |
-| Inference Steps | Unchanged |
-| Seed | Unchanged |
+| **Default** | Hardcoded parameters from `DEFAULTS` dict in `cell-config`; mode switch resets sliders to mode defaults |
+| **Wild** | Gemini reads the story and returns both the structured prompt AND parameter suggestions optimised for maximum satirical impact; sliders update visually to show what's being used |
 
-These are hardcoded defaults from the `DEFAULTS` dict in `cell-config`. This is not LLM-suggested settings — parameter recommendations based on story content are a separate, later feature.
+### Default mode — auto-adjustments on style switch
+
+When the user switches rendering style, `mode_selector.change` fires `update_mode()`, which resets:
+
+| Setting | Reimagine | Scene | Portrait |
+|---|---|---|---|
+| Guidance Scale | 2.5 | 3.5 | 3.5 |
+| ControlNet Scale | hidden | 0.8 | 0.7 |
+| ControlNet Guidance End | hidden | hidden | 0.8 |
+| Canny Low / High | hidden | hidden | 50 / 200 |
+| Inference Steps | unchanged | unchanged | unchanged |
+| Seed | unchanged | unchanged | unchanged |
+
+### Wild mode — Gemini parameter suggestions
+
+When the user clicks Cartoonify with Wild selected and a story entered, `build_wild_settings()` is called. It returns `(prompt, settings_dict)` where `settings_dict` contains:
+
+| Key | Range | What it controls |
+|---|---|---|
+| `mode` | reimagine / scene / portrait | Suggested rendering style (advisory — shown in log; does not auto-switch) |
+| `guidance` | 2.0–6.0 | Prompt dominance; higher = scathing tone holds harder |
+| `steps` | 28–40 | More = more detail; Wild pushes 35–40 for complex/confrontational content |
+| `cn_scale` | 0.3–1.2 | ControlNet conditioning strength |
+| `cn_end` | 0.50–1.0 | Step fraction ControlNet stays active; lower gives FLUX more finishing freedom |
+| `canny_low` | 10–100 | Canny lower threshold; lower = more edges (tighter face adherence) |
+| `canny_high` | 80–400 | Canny upper threshold |
+| `rationale` | string | One sentence explaining the parameter choices — displayed in the processing log |
+
+**Slider updates:** When Wild applies settings, the sliders in Advanced Settings update to show the values being used. The user can open Advanced Settings to see them.
+
+**Mode suggestion:** If Gemini's recommended rendering style differs from the one selected, the log shows an advisory note (e.g. `⚡ Wild suggests Portrait for this story (currently Reimagine)`). The rendering style is never switched automatically.
+
+**Fallback:** If Gemini fails or the settings JSON cannot be parsed, Wild falls back to a standard Gemini prompt call with current slider values.
+
+### Gemini call comparison
+
+| Aspect | Default mode | Wild mode |
+|---|---|---|
+| Function | `build_prompt_from_story()` | `build_wild_settings()` |
+| System prompt | `GEMINI_SYSTEM_PROMPT` | `WILD_SYSTEM_PROMPT` |
+| Output lines | 1 (prompt only) | 2 (prompt + settings JSON) |
+| `max_output_tokens` | 300 | 500 |
+| Returns | `str` | `(str, dict)` |
+
+Wild mode uses a richer system prompt with parameter tuning rules and three worked examples. The rules bias Gemini toward more aggressive parameter choices — higher guidance for confrontational stories, tighter Canny for face-critical caricature, more steps for complex compositions.
+
+**Parameter tuning rules in Wild mode (summary):**
+
+| Story signal | Wild choices |
+|---|---|
+| Confrontational / scathing / dark | guidance 4.5–5.5, steps 35–40 |
+| Whimsical / absurdist / ironic | guidance 2.5–3.5, steps 28–32 |
+| Face identity critical | Portrait, canny_low 20–40, canny_high 100–160, cn_scale 0.85–1.0 |
+| Crowd / hierarchy scene | Scene, cn_scale 0.85–0.95, steps 34–38 |
+| Total recomposition / allegory | Reimagine, guidance 2.5–3.0 |
+| More artistic hand-drawn feel | cn_end 0.70 |
 
 ---
 
 ## Processing Log — Narrative by Mode
 
-The `cartoonify()` function is a Python generator. Each `yield (image_or_None, log_text)` call updates both the result panel and the log textbox in real time.
+The `cartoonify()` function is a Python generator. Each `yield` updates the result panel, the log textbox, and (in Wild mode) the slider values simultaneously.
 
-**Reimagine:**
+**Default mode — Reimagine:**
 ```
-⏳ Gemini building your prompt...
+⧗ Gemini building your prompt...
 ✓ Prompt ready
-⏳ FLUX Kontext rendering...
+⧗ FLUX Kontext rendering...
 ✓ Done — saved to Drive
 ```
 
-**Scene:**
+**Default mode — Scene:**
 ```
-⏳ Gemini building your prompt...
+⧗ Gemini building your prompt...
 ✓ Prompt ready
-⏳ Reading scene depth...
+⧗ Reading scene depth...
 ✓ Depth map ready
-⏳ FLUX rendering...
+⧗ FLUX rendering...
 ✓ Done — saved to Drive
 ```
 
-**Portrait:**
+**Default mode — Portrait:**
 ```
-⏳ Gemini building your prompt...
+⧗ Gemini building your prompt...
 ✓ Prompt ready
-⏳ Extracting portrait outlines...
+⧗ Extracting portrait outlines...
 ✓ Outlines extracted
-⏳ FLUX rendering...
+⧗ FLUX rendering...
 ✓ Done — saved to Drive
 ```
 
-If the user has typed in `Edit prompt directly`, the Gemini call is skipped and the log reads `✓ Using manual prompt override`.
+**Wild mode (any style):**
+```
+⧗ Wild — Gemini building prompt and tuning for satire...
+✓ Wild settings applied
+   <rationale sentence from Gemini>
+   ⚡ Wild suggests Portrait for this story (currently Reimagine)   ← only if mode differs
+⧗ FLUX rendering...
+✓ Done — saved to Drive
+```
+
+If the user has typed in `Edit prompt directly`, the Gemini call is skipped entirely and the log reads `✓ Using manual prompt override`.
 
 ---
 
 ## Prompt Priority Order
 
 ```
-1. prompt_override (Edit prompt directly)  → skips Gemini entirely
-2. story (non-empty)                       → Gemini builds structured prompt
-3. No story, no override                   → DEFAULT_PROMPT from cell-config
+1. prompt_override (Edit prompt directly)     → skips Gemini entirely; Default slider values used
+2. Wild mode + story (non-empty)              → build_wild_settings() → prompt + slider updates
+3. Default mode + story (non-empty)           → build_prompt_from_story() → prompt only
+4. No story, no override (either mode)        → DEFAULT_PROMPT from cell-config
 ```
 
 Trigger word deduplication: `cartoonify()` checks `prompt.startswith(trigger)` before prepending, preventing the double-trigger bug that was present in notebooks 02–04.
@@ -202,14 +265,14 @@ Both base model variables are present (Kontext and FLUX.1-dev) since `load_pipel
 | `cell-gpu` | `!nvidia-smi` | Unchanged |
 | `cell-install` | pip dependencies | Includes `opencv-python-headless` (required for Portrait) |
 | `cell-restart` | Kernel restart | Unchanged |
-| `cell-imports` | All imports for all three modes | Adds `FluxKontextPipeline`, `FluxControlNetPipeline`, `FluxControlNetModel`, `cv2` |
+| `cell-imports` | All imports for all three modes | `FluxKontextPipeline`, `FluxControlNetPipeline`, `FluxControlNetModel`, `cv2`, `json` |
 | `cell-drive` | Mount Google Drive | Unchanged |
 | `cell-token` | `HF_TOKEN` + `GOOGLE_API_KEY` | Unchanged |
-| `cell-config` | All mutable variables | Adds `DEFAULTS`, `DEFAULT_MODE`, both base model IDs |
-| `cell-models` | `_peft_patch()` + `load_pipeline()` + initial load | New: `load_pipeline()` manages all three modes |
-| `cell-gemini` | `GEMINI_SYSTEM_PROMPT` + `build_prompt_from_story()` | Unchanged from 02–04 |
-| `cell-inference` | `extract_canny()` + `cartoonify()` generator | New: generator pattern; mode dispatch; trigger dedup |
-| `cell-ui` | Gradio Blocks UI + `demo.launch()` | New: story-first layout; three-pill mode selector; live log |
+| `cell-config` | All mutable variables | Adds `DEFAULTS`, `DEFAULT_MODE`, `DEFAULT_SETTINGS_MODE`, both base model IDs |
+| `cell-models` | `_peft_patch()` + `load_pipeline()` + initial load | `load_pipeline()` manages all three modes; VRAM unload on switch |
+| `cell-gemini` | Both Gemini functions | `GEMINI_SYSTEM_PROMPT` + `build_prompt_from_story()` (Default) + `WILD_SYSTEM_PROMPT` + `build_wild_settings()` (Wild) |
+| `cell-inference` | `extract_canny()` + `cartoonify()` generator | Generator yields 9-tuple: `(image, log, spinner_html, guidance, steps, cn_scale, cn_end, canny_low, canny_high)` |
+| `cell-ui` | Gradio Blocks UI + `demo.launch()` | Story-first layout; mode selector; settings mode toggle; sliders in generate outputs |
 
 ---
 

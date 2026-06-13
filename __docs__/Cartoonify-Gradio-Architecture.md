@@ -109,6 +109,10 @@ The PEFT torchao patch is required because `peft` attempts to call `torchao` at 
 
 Notebooks 02, 03, and 04 all use the same `build_prompt_from_story()` function and the same `GEMINI_SYSTEM_PROMPT` constant (defined in `cell-gemini`). Nothing changes between versions.
 
+Notebook 05 adds a second Gemini function, `build_wild_settings()`, for Wild settings mode.
+
+### `build_prompt_from_story()` — Default mode
+
 The function takes a plain-text story and returns a structured seven-layer prompt:
 
 ```
@@ -125,7 +129,21 @@ gdo_cartoon <medium>, <technique>, <color>, <mood>, <commentary>, <composition>
 | Commentary | Derived from story | e.g. `political commentary \| scathing \| power critique \| deadpan` |
 | Composition | Derived from story | e.g. `two-group layout \| standing figure left \| queue right \| speech bubble top` |
 
-Gemini call parameters: `temperature=0.7`, `max_output_tokens=300`. The call takes under 2 seconds and uses no GPU memory.
+Call parameters: `temperature=0.7`, `max_output_tokens=300`. Under 2 seconds, no GPU memory.
+
+### `build_wild_settings()` — Wild mode (notebook 05 only)
+
+Returns `(prompt_str, settings_dict)`. The settings dict contains generation parameters Gemini suggests for maximum satirical impact based on the story content.
+
+Output format — two lines from Gemini:
+```
+Line 1: [standard seven-layer prompt]
+Line 2: {"mode": "...", "guidance": ..., "steps": ..., "cn_scale": ..., "cn_end": ..., "canny_low": ..., "canny_high": ..., "rationale": "..."}
+```
+
+Call parameters: `temperature=0.7`, `max_output_tokens=500`. The richer system prompt includes worked examples and parameter tuning rules keyed on story signals (confrontational tone → high guidance; face identity → tight Canny; crowd scene → Scene mode with high CN scale).
+
+The settings dict drives slider updates in the Gradio UI — sliders change value visually during generation to show what's being used. The rationale string appears in the processing log.
 
 ---
 
@@ -159,6 +177,7 @@ OUTPUT_DIR       = '/content/drive/MyDrive/cartoonify/outputs'
 | `DEFAULT_CANNY_LOW` | — | — | `50` | Per mode via `DEFAULTS` dict |
 | `DEFAULT_CANNY_HIGH` | — | — | `200` | Per mode via `DEFAULTS` dict |
 | `DEFAULT_MODE` | — | — | — | `'Reimagine'` |
+| `DEFAULT_SETTINGS_MODE` | — | — | — | `'Default'` |
 
 ---
 
@@ -186,6 +205,7 @@ Every notebook uses the same two-column Gradio Blocks layout.
 | Story accordion | — | ✓ | ✓ | ✓ | Always open (no accordion) |
 | Build Prompt button | — | ✓ | ✓ | ✓ | — (Gemini runs on generate) |
 | Mode selector | — | — | — | — | Three-pill radio (Reimagine / Scene / Portrait) |
+| Settings mode toggle | — | — | — | — | Two-option radio (Default / Wild) |
 | ControlNet scale slider | ✓ | ✓ | — | ✓ | ✓ (hidden for Reimagine) |
 | Canny threshold sliders | — | — | — | ✓ (×2) | ✓ (Portrait only, ×2) |
 | ControlNet guidance end slider | — | — | — | ✓ | ✓ (Portrait only) |

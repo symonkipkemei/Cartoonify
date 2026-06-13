@@ -34,7 +34,8 @@ Photo upload  →  Resize to 1024 × 1024
 | **Kontext** | `03` | Portrait satire — subject must stay recognisable |
 | **Canny** | `04` | Tight caricature — follow source outlines closely |
 
-All modes use the same Gemini story-to-prompt layer (notebooks `02`–`04`).
+All modes use the same Gemini story-to-prompt layer (notebooks `02`–`05`).
+Notebook `05` combines all three modes in a single interface — recommended starting point.
 
 ---
 
@@ -52,7 +53,8 @@ Cartoonify/
 │   │   ├── 01_Cartoonify_Gradio_Depth.ipynb        # Depth ControlNet — prompt only
 │   │   ├── 02_Cartoonify_Gradio_Depth_Story.ipynb  # Depth ControlNet + Gemini story layer
 │   │   ├── 03_Cartoonify_Gradio_Kontext.ipynb      # FLUX Kontext — semantic recomposition
-│   │   └── 04_Cartoonify_Gradio_Canny.ipynb        # Canny ControlNet — edge-based
+│   │   ├── 04_Cartoonify_Gradio_Canny.ipynb        # Canny ControlNet — edge-based
+│   │   └── 05_Cartoonify_Gradio_Unified.ipynb      # Unified — all three modes, one interface
 │   │
 │   └── lora-training/       # LoRA preparation and training
 │       ├── 01_FLUX_LoRA_Preparation.ipynb
@@ -75,11 +77,11 @@ Cartoonify/
 
 **Requires:** Google Colab Pro → Runtime → Change runtime type → **A100 GPU**
 
-1. Open [notebooks/cartoonify/02_Cartoonify_Gradio_Depth_Story.ipynb](notebooks/cartoonify/02_Cartoonify_Gradio_Depth_Story.ipynb) in Colab
+1. Open [notebooks/cartoonify/05_Cartoonify_Gradio_Unified.ipynb](notebooks/cartoonify/05_Cartoonify_Gradio_Unified.ipynb) in Colab
 2. Add `HF_TOKEN` and `GOOGLE_API_KEY` to Colab Secrets (left sidebar → key icon)
 3. Run all cells in order — first run downloads ~24 GB of model weights (~4 min)
 4. Open the public Gradio URL printed at the end of the last cell
-5. Expand **What's the Story?** → write a story → click **Build Prompt** → upload a photo → **Cartoonify**
+5. Write your story → upload a photo → pick a rendering style → click **Cartoonify**
 
 Subsequent runs use the Colab model cache and load in ~1 minute.
 
@@ -113,14 +115,16 @@ DEFAULT_TRIGGER  = 'your_trigger_word'
 
 ## Key parameters
 
-| Parameter | Depth (01/02) | Kontext (03) | Canny (04) |
-|---|---|---|---|
-| Guidance Scale | 3.5 | 2.5 | 3.5 |
-| Inference Steps | 28 | 28 | 28 |
-| ControlNet Scale | 0.8 | — | 0.7 |
-| ControlNet End | — | — | 0.8 |
-| Canny Low / High | — | — | 50 / 200 |
-| Seed | 42 | 42 | 42 |
+| Parameter | Depth (01/02) | Kontext (03) | Canny (04) | Unified 05 — Reimagine | Unified 05 — Scene | Unified 05 — Portrait |
+|---|---|---|---|---|---|---|
+| Guidance Scale | 3.5 | 2.5 | 3.5 | 2.5 | 3.5 | 3.5 |
+| Inference Steps | 28 | 28 | 28 | 28 | 28 | 28 |
+| ControlNet Scale | 0.8 | — | 0.7 | — | 0.8 | 0.7 |
+| ControlNet End | — | — | 0.8 | — | — | 0.8 |
+| Canny Low / High | — | — | 50 / 200 | — | — | 50 / 200 |
+| Seed | 42 | 42 | 42 | 42 | 42 | 42 |
+
+Notebook `05` auto-adjusts these defaults when the rendering style is changed in the UI.
 
 ---
 
@@ -128,6 +132,7 @@ DEFAULT_TRIGGER  = 'your_trigger_word'
 
 | Notebook | Mode | Description |
 |---|---|---|
+| [05_Cartoonify_Gradio_Unified.ipynb](notebooks/cartoonify/05_Cartoonify_Gradio_Unified.ipynb) | **All three** | **Recommended** — story-first UI, three rendering styles, dynamic pipeline loading |
 | [01_Cartoonify_Gradio_Depth.ipynb](notebooks/cartoonify/01_Cartoonify_Gradio_Depth.ipynb) | Depth | Baseline — manual prompt, no Gemini |
 | [02_Cartoonify_Gradio_Depth_Story.ipynb](notebooks/cartoonify/02_Cartoonify_Gradio_Depth_Story.ipynb) | Depth + Gemini | Story → Gemini → structured prompt → depth ControlNet |
 | [03_Cartoonify_Gradio_Kontext.ipynb](notebooks/cartoonify/03_Cartoonify_Gradio_Kontext.ipynb) | Kontext | Full image content → FluxKontextPipeline |
@@ -141,6 +146,9 @@ DEFAULT_TRIGGER  = 'your_trigger_word'
 
 **Architecture (shared across all notebooks):**
 - [System Architecture](__docs__/Cartoonify-Gradio-Architecture.md) — component comparison, Gemini layer, LoRA loading, Gradio layout, runtime requirements
+
+**Unified interface:**
+- [Unified Interface](__docs__/Cartoonify-Unified-Interface.md) — notebook 05 — flow, VRAM switching, mode selector, processing log, configuration
 
 **Image workflows (one per conditioning mode):**
 - [Depth ControlNet Workflow](__docs__/Cartoonify-Depth%20ControlNet-Workflow.md) — notebooks 01/02 — Depth-Anything-V2 → FluxControlNetPipeline
