@@ -115,6 +115,7 @@ DEFAULT_TRIGGER  = 'your_trigger_word'
 | Notebook | Purpose |
 |---|---|
 | [07_Cartoonify_Gradio.ipynb](model/notebooks/interface/07_Cartoonify_Gradio.ipynb) | Main app — working prototype |
+| [08_Cartoonify_Story_Gradio.ipynb](model/notebooks/interface/08_Cartoonify_Story_Gradio.ipynb) | Adds Gemini story-to-prompt layer |
 | [06_Gradio_FLUX_Depth_LoRA.ipynb](model/notebooks/interface/06_Gradio_FLUX_Depth_LoRA.ipynb) | Predecessor: FLUX + depth + LoRA (no UI polish) |
 | [02_FLUX_LoRA_Train.ipynb](model/notebooks/lora-training/02_FLUX_LoRA_Train.ipynb) | LoRA fine-tuning |
 | [01_FLUX_LoRA_Preparation.ipynb](model/notebooks/lora-training/01_FLUX_LoRA_Preparation.ipynb) | Dataset preparation and caption structuring |
