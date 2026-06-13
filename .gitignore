@@ -392,3 +392,4 @@ __sample__/
 *__sample__/*
 
 .claude
+.venv-ui/
