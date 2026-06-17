@@ -25,9 +25,21 @@ DEFAULTS = {
 }
 
 MODE_DESCRIPTIONS = {
-    'Reimagine': 'Free creative recomposition — scene and staging can change.',
-    'Scene':     'Locks depth layout — best for crowds and architecture.',
-    'Portrait':  'Preserves face edges — keeps a specific person recognisable.',
+    'Reimagine': (
+        'FLUX recomposes the full image freely. '
+        'The scene, staging, background and framing can all shift. '
+        'Best for bold creative reinterpretation where you want maximum satirical transformation.'
+    ),
+    'Scene': (
+        'A depth map locks the spatial layout and figure positions. '
+        'Foreground and background relationships stay intact. '
+        'Best for crowd scenes, protests, or architecture where structure must be preserved.'
+    ),
+    'Portrait': (
+        'Canny edge detection traces face and body outlines before rendering. '
+        'The person stays immediately recognisable in the cartoon. '
+        'Best when satirising a specific individual — politician, CEO, public figure.'
+    ),
 }
 
 # ── Placeholder image (replaces real FLUX output) ─────────────────────────────
@@ -84,9 +96,9 @@ _STATUS_IDLE = _status('Upload a photo, describe your story, then hit Cartoonify
 # ── Image upload → show on canvas, reset result ───────────────────────────────
 def on_image_upload(image):
     if image is None:
-        return gr.update(value=None), None, gr.update(visible=False), gr.update(visible=False), None
+        return gr.update(value=None), None, gr.update(visible=False), None
     pil = Image.fromarray(image) if isinstance(image, np.ndarray) else image
-    return gr.update(value=pil), pil, gr.update(visible=False), gr.update(visible=False), None
+    return gr.update(value=pil), pil, gr.update(visible=False), None
 
 
 # ── Toggle between original and cartoon ───────────────────────────────────────
@@ -112,18 +124,14 @@ def cartoonify(
              g=None, s=None, cn_s=None, cn_e=None, clow=None, chigh=None):
         if show_toggle is None:
             toggle_upd = gr.update()
-            label_upd  = gr.update()
         elif show_toggle:
             toggle_upd = gr.update(visible=True, value='Cartoon')
-            label_upd  = gr.update(visible=True)
         else:
             toggle_upd = gr.update(visible=False)
-            label_upd  = gr.update(visible=False)
         return (
             gr.update() if canvas is None else gr.update(value=canvas),
             gr.update() if status is None else gr.update(value=status),
             gr.update() if result is None else result,
-            label_upd,
             toggle_upd,
             gr.update() if g     is None else gr.update(value=g),
             gr.update() if s     is None else gr.update(value=s),
@@ -293,12 +301,12 @@ CSS = '''
 }
 #cfy-mode-nav input[type="radio"] { display: none !important; }
 
-/* Mode description — compact one-liner hint */
-#cfy-mode-desc { margin-top: 0.1rem !important; margin-bottom: 0.25rem !important; }
+/* Mode description */
+#cfy-mode-desc { margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; }
 #cfy-mode-desc p {
-    color: #4b4b55 !important; font-size: 0.68rem !important;
-    line-height: 1.4 !important; margin: 0 !important;
-    padding: 0.2rem 0.65rem !important;
+    color: var(--muted) !important; font-size: 0.76rem !important;
+    line-height: 1.55 !important; margin: 0 !important;
+    padding: 0.25rem 0.65rem !important;
 }
 
 /* Wild toggle */
@@ -357,22 +365,17 @@ CSS = '''
 }
 #cfy-canvas img { border-radius: 10px !important; object-fit: contain !important; }
 
-/* Compare label + toggle row */
-#cfy-toggle-row { justify-content: center !important; align-items: center !important; padding: 0 !important; gap: 0.6rem !important; }
-#cfy-toggle-row > .wrap { justify-content: center !important; align-items: center !important; gap: 0.6rem !important; }
-#cfy-compare-label { padding: 0 !important; }
-.cfy-compare-label {
-    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.1em; color: var(--muted);
-}
+/* Original / Cartoon toggle — full-width segmented bar */
 #cfy-toggle {
+    width: 100% !important;
     background: var(--surface) !important; border: 1px solid var(--border) !important;
-    border-radius: 999px !important; padding: 3px !important; width: auto !important;
+    border-radius: 10px !important; padding: 4px !important;
 }
-#cfy-toggle .wrap { display: flex !important; gap: 2px !important; }
+#cfy-toggle .wrap { display: flex !important; gap: 4px !important; width: 100% !important; }
 #cfy-toggle label {
-    padding: 0.28rem 1.1rem !important; border-radius: 999px !important;
-    font-size: 0.76rem !important; font-weight: 600 !important;
+    flex: 1 !important; text-align: center !important;
+    padding: 0.48rem 0 !important; border-radius: 8px !important;
+    font-size: 0.82rem !important; font-weight: 600 !important;
     color: var(--muted) !important; cursor: pointer !important;
     transition: background 0.15s, color 0.15s !important;
     border: none !important; background: transparent !important;
@@ -478,7 +481,8 @@ with gr.Blocks(title='Cartoonify') as demo:
             gr.HTML('<span class="cfy-section-label">Mode</span>')
             mode_selector = gr.Radio(
                 choices=['Reimagine', 'Scene', 'Portrait'],
-                value=DEFAULT_MODE, label='', elem_id='cfy-mode-nav',
+                value=DEFAULT_MODE, label='', show_label=False,
+                elem_id='cfy-mode-nav',
             )
             mode_desc = gr.Markdown(
                 value=MODE_DESCRIPTIONS[DEFAULT_MODE],
@@ -545,16 +549,11 @@ with gr.Blocks(title='Cartoonify') as demo:
             )
 
             # Original / Cartoon toggle (hidden until generation completes)
-            with gr.Row(elem_id='cfy-toggle-row'):
-                toggle_label = gr.HTML(
-                    '<span class="cfy-compare-label">Compare</span>',
-                    visible=False, elem_id='cfy-compare-label',
-                )
-                view_toggle = gr.Radio(
-                    choices=['Original', 'Cartoon'],
-                    value='Cartoon', label='',
-                    visible=False, elem_id='cfy-toggle',
-                )
+            view_toggle = gr.Radio(
+                choices=['Original', 'Cartoon'],
+                value='Cartoon', label='', show_label=False,
+                visible=False, elem_id='cfy-toggle',
+            )
 
             gr.HTML('<span class="cfy-section-label" style="margin:0 0 0.2rem">Activity</span>')
             status_output = gr.HTML(value=_STATUS_IDLE, elem_id='cfy-status-box')
@@ -592,7 +591,7 @@ with gr.Blocks(title='Cartoonify') as demo:
     # Upload → show on canvas, store as original, clear prior result + toggle
     img_input.change(
         fn=on_image_upload, inputs=[img_input],
-        outputs=[canvas_display, original_state, toggle_label, view_toggle, result_state],
+        outputs=[canvas_display, original_state, view_toggle, result_state],
     )
 
     # Generate → stream updates to canvas/status/sliders; reveal toggle at end
@@ -606,7 +605,7 @@ with gr.Blocks(title='Cartoonify') as demo:
         ],
         outputs=[
             canvas_display, status_output, result_state,
-            toggle_label, view_toggle,
+            view_toggle,
             guidance_slider, steps_slider,
             cn_scale_slider, cn_end_slider,
             canny_low_slider, canny_high_slider,
