@@ -25,9 +25,9 @@ DEFAULTS = {
 }
 
 MODE_DESCRIPTIONS = {
-    'Reimagine': 'FLUX recomposes the full image freely — best for creative reinterpretation where scene and staging can change.',
-    'Scene':     'Depth map locks spatial layout and figure positions — best for crowds and architecture where structure matters.',
-    'Portrait':  'Canny edges preserve face outlines — best when a specific person must be immediately recognisable.',
+    'Reimagine': 'Free creative recomposition — scene and staging can change.',
+    'Scene':     'Locks depth layout — best for crowds and architecture.',
+    'Portrait':  'Preserves face edges — keeps a specific person recognisable.',
 }
 
 # ── Placeholder image (replaces real FLUX output) ─────────────────────────────
@@ -84,9 +84,9 @@ _STATUS_IDLE = _status('Upload a photo, describe your story, then hit Cartoonify
 # ── Image upload → show on canvas, reset result ───────────────────────────────
 def on_image_upload(image):
     if image is None:
-        return gr.update(value=None), None, gr.update(visible=False), None
+        return gr.update(value=None), None, gr.update(visible=False), gr.update(visible=False), None
     pil = Image.fromarray(image) if isinstance(image, np.ndarray) else image
-    return gr.update(value=pil), pil, gr.update(visible=False), None
+    return gr.update(value=pil), pil, gr.update(visible=False), gr.update(visible=False), None
 
 
 # ── Toggle between original and cartoon ───────────────────────────────────────
@@ -112,14 +112,18 @@ def cartoonify(
              g=None, s=None, cn_s=None, cn_e=None, clow=None, chigh=None):
         if show_toggle is None:
             toggle_upd = gr.update()
+            label_upd  = gr.update()
         elif show_toggle:
             toggle_upd = gr.update(visible=True, value='Cartoon')
+            label_upd  = gr.update(visible=True)
         else:
             toggle_upd = gr.update(visible=False)
+            label_upd  = gr.update(visible=False)
         return (
             gr.update() if canvas is None else gr.update(value=canvas),
             gr.update() if status is None else gr.update(value=status),
             gr.update() if result is None else result,
+            label_upd,
             toggle_upd,
             gr.update() if g     is None else gr.update(value=g),
             gr.update() if s     is None else gr.update(value=s),
@@ -289,11 +293,12 @@ CSS = '''
 }
 #cfy-mode-nav input[type="radio"] { display: none !important; }
 
-/* Mode description */
-#cfy-mode-desc { margin-top: 0.15rem !important; }
+/* Mode description — compact one-liner hint */
+#cfy-mode-desc { margin-top: 0.1rem !important; margin-bottom: 0.25rem !important; }
 #cfy-mode-desc p {
-    color: var(--muted) !important; font-size: 0.74rem !important;
-    line-height: 1.5 !important; margin: 0 !important; font-style: italic !important;
+    color: #4b4b55 !important; font-size: 0.68rem !important;
+    line-height: 1.4 !important; margin: 0 !important;
+    padding: 0.2rem 0.65rem !important;
 }
 
 /* Wild toggle */
@@ -352,9 +357,14 @@ CSS = '''
 }
 #cfy-canvas img { border-radius: 10px !important; object-fit: contain !important; }
 
-/* View toggle — centered pill */
-#cfy-toggle-row { justify-content: center !important; padding: 0 !important; }
-#cfy-toggle-row > .wrap { justify-content: center !important; }
+/* Compare label + toggle row */
+#cfy-toggle-row { justify-content: center !important; align-items: center !important; padding: 0 !important; gap: 0.6rem !important; }
+#cfy-toggle-row > .wrap { justify-content: center !important; align-items: center !important; gap: 0.6rem !important; }
+#cfy-compare-label { padding: 0 !important; }
+.cfy-compare-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted);
+}
 #cfy-toggle {
     background: var(--surface) !important; border: 1px solid var(--border) !important;
     border-radius: 999px !important; padding: 3px !important; width: auto !important;
@@ -370,16 +380,23 @@ CSS = '''
 #cfy-toggle label:has(input:checked) { background: var(--accent) !important; color: white !important; }
 #cfy-toggle input[type="radio"] { display: none !important; }
 
-/* Status line */
+/* Activity / status box */
+#cfy-status-box {
+    background: var(--surface-2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    padding: 0.5rem 0.75rem !important;
+    min-height: 2.4rem !important;
+}
 .cfy-status {
     display: flex; align-items: center; gap: 0.55rem;
-    min-height: 1.6rem; padding: 0.1rem 0;
+    min-height: 1.4rem; padding: 0;
     font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
-    font-size: 0.74rem; color: var(--muted);
+    font-size: 0.73rem; color: var(--muted);
 }
 .cfy-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .cfy-progress-wrap { flex: 1; display: flex; flex-direction: column; gap: 3px; }
-.cfy-progress-label { display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--muted); }
+.cfy-progress-label { display: flex; justify-content: space-between; font-size: 0.73rem; color: var(--muted); }
 .cfy-progress-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
 .cfy-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.08s linear; }
 @keyframes dot-pulse {
@@ -411,12 +428,20 @@ CSS = '''
     box-shadow: 0 0 0 2px var(--accent-dim) !important;
 }
 
-/* Photo upload thumb */
+/* Photo upload thumb — compact, no bleed */
 .cfy-upload {
     border: 2px dashed var(--border) !important; border-radius: 8px !important;
     background: var(--surface-2) !important; transition: border-color 0.2s !important;
+    overflow: hidden !important;
 }
 .cfy-upload:hover { border-color: var(--accent) !important; }
+/* Hide the verbose upload instructions; keep only the small icon */
+.cfy-upload .wrap { overflow: hidden !important; height: 100% !important; }
+.cfy-upload p,
+.cfy-upload .upload-text,
+.cfy-upload span.or { display: none !important; }
+.cfy-upload button.upload { display: none !important; }
+.cfy-upload svg { width: 20px !important; height: 20px !important; opacity: 0.4 !important; }
 
 /* Generate button */
 #cfy-btn button {
@@ -521,13 +546,18 @@ with gr.Blocks(title='Cartoonify') as demo:
 
             # Original / Cartoon toggle (hidden until generation completes)
             with gr.Row(elem_id='cfy-toggle-row'):
+                toggle_label = gr.HTML(
+                    '<span class="cfy-compare-label">Compare</span>',
+                    visible=False, elem_id='cfy-compare-label',
+                )
                 view_toggle = gr.Radio(
                     choices=['Original', 'Cartoon'],
                     value='Cartoon', label='',
                     visible=False, elem_id='cfy-toggle',
                 )
 
-            status_output = gr.HTML(value=_STATUS_IDLE)
+            gr.HTML('<span class="cfy-section-label" style="margin:0 0 0.2rem">Activity</span>')
+            status_output = gr.HTML(value=_STATUS_IDLE, elem_id='cfy-status-box')
 
             # Bottom bar: story text (left) + photo upload thumb (right)
             with gr.Row(elem_id='cfy-input-row', equal_height=True):
@@ -547,7 +577,7 @@ with gr.Blocks(title='Cartoonify') as demo:
                     )
 
             generate_btn = gr.Button(
-                '&#127912;  Cartoonify  →',
+                'Cartoonify',
                 variant='primary', elem_id='cfy-btn',
             )
 
@@ -562,7 +592,7 @@ with gr.Blocks(title='Cartoonify') as demo:
     # Upload → show on canvas, store as original, clear prior result + toggle
     img_input.change(
         fn=on_image_upload, inputs=[img_input],
-        outputs=[canvas_display, original_state, view_toggle, result_state],
+        outputs=[canvas_display, original_state, toggle_label, view_toggle, result_state],
     )
 
     # Generate → stream updates to canvas/status/sliders; reveal toggle at end
@@ -575,7 +605,8 @@ with gr.Blocks(title='Cartoonify') as demo:
             seed_input, prompt_input,
         ],
         outputs=[
-            canvas_display, status_output, result_state, view_toggle,
+            canvas_display, status_output, result_state,
+            toggle_label, view_toggle,
             guidance_slider, steps_slider,
             cn_scale_slider, cn_end_slider,
             canny_low_slider, canny_high_slider,
