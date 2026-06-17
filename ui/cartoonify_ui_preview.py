@@ -7,15 +7,16 @@ Only requires: gradio, Pillow
 
 import time
 import random
+import numpy as np
 import gradio as gr
 from PIL import Image, ImageDraw
 
 # ── Config ────────────────────────────────────────────────────────────────────
-DEFAULT_TRIGGER       = 'gdo_cartoon'
-DEFAULT_PROMPT        = 'satirical cartoon illustration, bold outlines, vivid flat colours'
-DEFAULT_MODE          = 'Reimagine'
-DEFAULT_STEPS         = 28
-DEFAULT_SEED          = 42
+DEFAULT_TRIGGER = 'gdo_cartoon'
+DEFAULT_PROMPT  = 'satirical cartoon illustration, bold outlines, vivid flat colours'
+DEFAULT_MODE    = 'Reimagine'
+DEFAULT_STEPS   = 28
+DEFAULT_SEED    = 42
 
 DEFAULTS = {
     'reimagine': {'guidance': 2.5, 'cn_scale': 0.7, 'cn_end': 0.8, 'canny_low': 50,  'canny_high': 200},
@@ -54,24 +55,18 @@ def _make_placeholder(mode: str, story: str) -> Image.Image:
 
 # ── Status HTML helpers ───────────────────────────────────────────────────────
 def _status(msg: str, state: str = 'processing') -> str:
-    """Return an HTML status line. state: idle | processing | done | warn"""
-    colors = {
-        'idle':       '#3f3f46',
-        'processing': '#a78bfa',
-        'done':       '#34d399',
-        'warn':       '#fbbf24',
-    }
-    dot_color = colors.get(state, colors['processing'])
+    colors = {'idle': '#3f3f46', 'processing': '#a78bfa', 'done': '#34d399', 'warn': '#fbbf24'}
+    c    = colors.get(state, colors['processing'])
     anim = ' animation:dot-pulse 1.2s ease-in-out infinite;' if state == 'processing' else ''
     return (
         f'<div class="cfy-status">'
-        f'<div class="cfy-dot" style="background:{dot_color};{anim}"></div>'
+        f'<div class="cfy-dot" style="background:{c};{anim}"></div>'
         f'<span>{msg}</span>'
         f'</div>'
     )
 
 def _progress(step: int, total: int) -> str:
-    pct  = int(100 * step / max(total, 1))
+    pct = int(100 * step / max(total, 1))
     return (
         f'<div class="cfy-status">'
         f'<div class="cfy-dot" style="background:#a78bfa;animation:dot-pulse 1.2s ease-in-out infinite;"></div>'
@@ -83,7 +78,21 @@ def _progress(step: int, total: int) -> str:
         f'</div></div></div>'
     )
 
-_STATUS_IDLE = _status('Click Cartoonify to begin.', 'idle')
+_STATUS_IDLE = _status('Upload a photo, describe your story, then hit Cartoonify.', 'idle')
+
+
+# ── Image upload → show on canvas, reset result ───────────────────────────────
+def on_image_upload(image):
+    if image is None:
+        return gr.update(value=None), None, gr.update(visible=False), None
+    pil = Image.fromarray(image) if isinstance(image, np.ndarray) else image
+    return gr.update(value=pil), pil, gr.update(visible=False), None
+
+
+# ── Toggle between original and cartoon ───────────────────────────────────────
+def toggle_view(choice, original, result):
+    img = original if choice == 'Original' else result
+    return gr.update(value=img)
 
 
 # ── Mock cartoonify generator ─────────────────────────────────────────────────
@@ -93,32 +102,33 @@ def cartoonify(
     cn_scale, cn_end, canny_low, canny_high,
     seed, prompt_override,
 ):
-    """Generator — yields (result_image, status_html, g, s, cn_s, cn_e, clow, chigh)."""
+    """Generator — yields (canvas, status, result_state, view_toggle, g, s, cn_s, cn_e, clow, chigh)."""
     if image is None:
         raise gr.Error('Upload a photo first.')
 
     mode = mode_label.lower()
 
-    def emit(image_val=None, status=None, show_result=None,
+    def emit(canvas=None, status=None, result=None, show_toggle=None,
              g=None, s=None, cn_s=None, cn_e=None, clow=None, chigh=None):
-        if show_result is False:
-            res = gr.update(visible=False)
-        elif image_val is not None:
-            res = gr.update(value=image_val, visible=True)
+        if show_toggle is None:
+            toggle_upd = gr.update()
+        elif show_toggle:
+            toggle_upd = gr.update(visible=True, value='Cartoon')
         else:
-            res = gr.update()
+            toggle_upd = gr.update(visible=False)
         return (
-            res,
+            gr.update() if canvas is None else gr.update(value=canvas),
             gr.update() if status is None else gr.update(value=status),
-            gr.update() if g    is None else gr.update(value=g),
-            gr.update() if s    is None else gr.update(value=s),
-            gr.update() if cn_s is None else gr.update(value=cn_s),
-            gr.update() if cn_e is None else gr.update(value=cn_e),
-            gr.update() if clow is None else gr.update(value=clow),
+            gr.update() if result is None else result,
+            toggle_upd,
+            gr.update() if g     is None else gr.update(value=g),
+            gr.update() if s     is None else gr.update(value=s),
+            gr.update() if cn_s  is None else gr.update(value=cn_s),
+            gr.update() if cn_e  is None else gr.update(value=cn_e),
+            gr.update() if clow  is None else gr.update(value=clow),
             gr.update() if chigh is None else gr.update(value=chigh),
         )
 
-    # Working param values (may be overridden by Wild)
     g_val     = guidance_scale
     s_val     = int(num_steps)
     cn_s_val  = cn_scale
@@ -165,14 +175,18 @@ def cartoonify(
     time.sleep(0.2)
 
     # ── Step 3: Fake inference with CSS progress bar ──────────────────────────
-    yield emit(status=_progress(0, s_val), show_result=False)
-    for step in range(1, s_val + 1):
+    for step in range(0, s_val + 1):
         time.sleep(0.06)
         yield emit(status=_progress(step, s_val))
 
     # ── Step 4: Result ────────────────────────────────────────────────────────
-    result = _make_placeholder(mode, story)
-    yield emit(image_val=result, status=_status('✓ Done — mock output (no GPU)', 'done'))
+    result_img = _make_placeholder(mode, story)
+    yield emit(
+        canvas=result_img,
+        status=_status('✓ Done — toggle to compare with your original', 'done'),
+        result=result_img,
+        show_toggle=True,
+    )
 
 
 # ── Mode update (slider visibility + description) ─────────────────────────────
@@ -192,214 +206,225 @@ def update_mode(mode):
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 CSS = '''
-/* ── Reset & tokens ─────────────────────────────────────── */
+/* ── Tokens ──────────────────────────────────────────────── */
 :root {
-    --bg:           #0d0d0f;
-    --surface:      #17171a;
-    --surface-2:    #1e1e22;
-    --border:       #2a2a30;
-    --accent:       #a78bfa;
-    --accent-dim:   rgba(167,139,250,0.12);
-    --text:         #f4f4f5;
-    --text-muted:   #71717a;
-    --success:      #34d399;
-    --amber:        #fbbf24;
-    --amber-dim:    rgba(251,191,36,0.10);
-    --radius:       14px;
+    --bg:         #0d0d0f;
+    --surface:    #17171a;
+    --surface-2:  #1e1e22;
+    --border:     #2a2a30;
+    --accent:     #a78bfa;
+    --accent-dim: rgba(167,139,250,0.12);
+    --text:       #f4f4f5;
+    --muted:      #71717a;
+    --amber:      #fbbf24;
+    --amber-dim:  rgba(251,191,36,0.10);
+    --radius:     12px;
 }
 
-/* ── Page ────────────────────────────────────────────────── */
+/* ── Page reset ──────────────────────────────────────────── */
 .gradio-container {
     font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif !important;
     background: var(--bg) !important;
-    max-width: 1320px !important;
-    margin: 0 auto !important;
-    padding: 1.25rem 1.5rem 2rem !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
     color: var(--text) !important;
 }
 .gradio-container * { box-sizing: border-box; }
+.dark, body, .main, .wrap, .contain, .block { background: transparent !important; }
 
-/* override Gradio Soft/Base surface colours */
-.dark, body, .main, .wrap, .contain, .block {
-    background: transparent !important;
+/* ── Outer row (sidebar | canvas) ───────────────────────── */
+#cfy-app { gap: 0 !important; }
+#cfy-app > .wrap { gap: 0 !important; }
+
+/* ── SIDEBAR ─────────────────────────────────────────────── */
+#cfy-sidebar {
+    min-width: 268px !important;
+    max-width: 268px !important;
+    background: var(--surface) !important;
+    border-right: 1px solid var(--border) !important;
+    padding: 1.25rem 1rem !important;
+    overflow-y: auto !important;
+    align-self: stretch !important;
 }
 
-/* ── Header ──────────────────────────────────────────────── */
-#cfy-header {
-    padding: 2.25rem 2rem 1.75rem;
-    text-align: center;
-    margin-bottom: 0;
-}
-.cfy-title {
+.cfy-logo {
     display: block;
-    font-size: 2.75rem; font-weight: 900; letter-spacing: -2.5px;
-    color: var(--text); line-height: 1;
-    margin-bottom: 0.5rem;
-}
-.cfy-subtitle {
-    display: block;
-    font-size: 0.92rem; color: var(--text-muted);
-    font-weight: 400; line-height: 1.6;
+    font-size: 1.25rem; font-weight: 900; letter-spacing: -0.8px;
+    color: var(--text); padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--border); margin-bottom: 0.75rem;
 }
 .cfy-badge {
-    display: inline-block;
+    display: inline-block; margin-left: 0.4rem;
     background: var(--amber-dim); color: var(--amber);
     border: 1px solid rgba(251,191,36,0.25);
-    font-size: 0.65rem; font-weight: 800; padding: 0.18rem 0.55rem;
-    border-radius: 20px; letter-spacing: 0.1em;
-    text-transform: uppercase; margin-top: 0.75rem;
+    font-size: 0.58rem; font-weight: 800; padding: 0.1rem 0.4rem;
+    border-radius: 20px; letter-spacing: 0.08em; text-transform: uppercase;
+    vertical-align: middle;
 }
 
-/* ── Mode nav tab row ─────────────────────────────────────── */
-#cfy-mode-nav-row {
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 1.25rem;
-    padding: 0 0.5rem;
+.cfy-section-label {
+    display: block;
+    font-size: 0.62rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted);
+    margin: 1rem 0 0.3rem;
 }
+
+/* Mode radio — vertical list */
 #cfy-mode-nav { background: transparent !important; border: none !important; padding: 0 !important; }
-#cfy-mode-nav .wrap { display: flex !important; gap: 0 !important; }
+#cfy-mode-nav .wrap { flex-direction: column !important; gap: 1px !important; }
 #cfy-mode-nav label {
-    flex: 0 1 auto !important;
-    padding: 0.65rem 1.5rem !important;
-    border: none !important;
-    border-bottom: 3px solid transparent !important;
-    border-radius: 0 !important;
+    padding: 0.45rem 0.6rem !important;
+    border-radius: 7px !important; border: none !important;
     background: transparent !important;
-    color: var(--text-muted) !important;
-    font-weight: 600 !important;
-    font-size: 0.875rem !important;
-    cursor: pointer !important;
-    transition: color 0.15s, border-color 0.15s !important;
-    margin-bottom: -1px !important;
-    letter-spacing: 0.01em !important;
+    color: var(--muted) !important; font-weight: 500 !important;
+    font-size: 0.85rem !important; cursor: pointer !important;
+    transition: background 0.15s, color 0.15s !important;
 }
 #cfy-mode-nav label:has(input:checked) {
-    color: var(--accent) !important;
-    border-bottom-color: var(--accent) !important;
+    background: var(--accent-dim) !important; color: var(--accent) !important;
 }
 #cfy-mode-nav label:hover:not(:has(input:checked)) {
-    color: var(--text) !important;
+    background: var(--surface-2) !important; color: var(--text) !important;
 }
 #cfy-mode-nav input[type="radio"] { display: none !important; }
 
-/* ── Cards ───────────────────────────────────────────────── */
-#cfy-left, #cfy-right {
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius) !important;
-    padding: 1.5rem !important;
-}
-
-/* ── Section labels ──────────────────────────────────────── */
-.cfy-label {
-    display: flex; align-items: center; gap: 0.5rem;
-    font-size: 0.68rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.12em;
-    color: var(--text-muted);
-    margin-bottom: 0.4rem; margin-top: 1rem;
-}
-.cfy-label:first-child { margin-top: 0; }
-.cfy-step {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 18px; height: 18px; border-radius: 50%;
-    background: var(--accent-dim); color: var(--accent);
-    font-size: 0.6rem; font-weight: 900; flex-shrink: 0;
-}
-
-/* ── Inputs ──────────────────────────────────────────────── */
-.gradio-container textarea, .gradio-container input[type="text"],
-.gradio-container input[type="number"] {
-    background: var(--surface-2) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 10px !important;
-    color: var(--text) !important;
-    font-size: 0.875rem !important;
-}
-.gradio-container textarea::placeholder,
-.gradio-container input::placeholder { color: var(--text-muted) !important; }
-.gradio-container textarea:focus, .gradio-container input:focus {
-    border-color: var(--accent) !important;
-    outline: none !important;
-    box-shadow: 0 0 0 3px var(--accent-dim) !important;
-}
-
-/* ── Upload zone ─────────────────────────────────────────── */
-.cfy-upload { border: 2px dashed var(--border) !important; border-radius: 12px !important; background: var(--surface-2) !important; transition: border-color 0.2s !important; }
-.cfy-upload:hover { border-color: var(--accent) !important; }
-
-/* ── Mode description ────────────────────────────────────── */
+/* Mode description */
+#cfy-mode-desc { margin-top: 0.15rem !important; }
 #cfy-mode-desc p {
-    color: var(--text-muted) !important;
-    font-size: 0.8rem !important;
-    line-height: 1.55 !important;
-    margin: 0 !important;
-    font-style: italic !important;
+    color: var(--muted) !important; font-size: 0.74rem !important;
+    line-height: 1.5 !important; margin: 0 !important; font-style: italic !important;
 }
 
-/* ── Wild toggle (checkbox styled as pill) ───────────────── */
-#cfy-wild { padding: 0.6rem 0.75rem !important; border-radius: 10px !important; background: var(--surface-2) !important; border: 1px solid var(--border) !important; transition: background 0.2s, border-color 0.2s !important; }
+/* Wild toggle */
+#cfy-wild {
+    padding: 0.5rem 0.6rem !important; border-radius: 8px !important;
+    background: var(--surface-2) !important; border: 1px solid var(--border) !important;
+    transition: background 0.2s, border-color 0.2s !important;
+}
 #cfy-wild:has(input:checked) { background: var(--amber-dim) !important; border-color: rgba(251,191,36,0.3) !important; }
-#cfy-wild label { color: var(--text) !important; font-weight: 700 !important; font-size: 0.82rem !important; cursor: pointer !important; gap: 0.6rem !important; }
+#cfy-wild label { color: var(--text) !important; font-weight: 600 !important; font-size: 0.79rem !important; cursor: pointer !important; gap: 0.5rem !important; }
 #cfy-wild input[type="checkbox"] {
     appearance: none !important; -webkit-appearance: none !important;
-    width: 2.25rem !important; height: 1.125rem !important;
+    width: 2rem !important; height: 1rem !important;
     background: var(--border) !important; border-radius: 999px !important;
-    position: relative !important; cursor: pointer !important;
-    transition: background 0.2s !important; flex-shrink: 0 !important;
+    position: relative !important; cursor: pointer !important; flex-shrink: 0 !important;
+    transition: background 0.2s !important;
 }
 #cfy-wild input[type="checkbox"]:checked { background: var(--amber) !important; }
 #cfy-wild input[type="checkbox"]::after {
     content: '' !important; position: absolute !important;
     top: 2px !important; left: 2px !important;
-    width: 14px !important; height: 14px !important;
+    width: 12px !important; height: 12px !important;
     background: white !important; border-radius: 50% !important;
     transition: transform 0.2s !important;
 }
-#cfy-wild input[type="checkbox"]:checked::after { transform: translateX(18px) !important; }
+#cfy-wild input[type="checkbox"]:checked::after { transform: translateX(16px) !important; }
 
-/* ── Fine-tune accordion ─────────────────────────────────── */
-.gradio-container details { background: transparent !important; border: 1px solid var(--border) !important; border-radius: 10px !important; margin-top: 0.75rem !important; }
-.gradio-container details summary { color: var(--text-muted) !important; font-size: 0.8rem !important; font-weight: 600 !important; padding: 0.6rem 0.75rem !important; }
+/* Accordion */
+.gradio-container details {
+    background: transparent !important; border: 1px solid var(--border) !important;
+    border-radius: 8px !important; margin-top: 0.65rem !important;
+}
+.gradio-container details summary {
+    color: var(--muted) !important; font-size: 0.78rem !important;
+    font-weight: 600 !important; padding: 0.45rem 0.6rem !important; cursor: pointer !important;
+}
 .gradio-container details summary:hover { color: var(--text) !important; }
 .gradio-container details[open] summary { color: var(--text) !important; border-bottom: 1px solid var(--border) !important; }
-.gradio-container details .block { padding: 0.75rem !important; }
+.gradio-container details .block { padding: 0.6rem !important; }
 
 /* Sliders */
 .gradio-container input[type="range"] { accent-color: var(--accent) !important; }
-.gradio-container label span { color: var(--text-muted) !important; font-size: 0.78rem !important; }
+.gradio-container label span { color: var(--muted) !important; font-size: 0.76rem !important; }
 
-/* ── Status line ─────────────────────────────────────────── */
+/* ── CANVAS AREA ─────────────────────────────────────────── */
+#cfy-canvas-area {
+    padding: 1.25rem !important; min-width: 0 !important;
+}
+#cfy-canvas-area > .wrap { display: flex; flex-direction: column; gap: 0.65rem; }
+
+/* Canvas */
+#cfy-canvas {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+}
+#cfy-canvas img { border-radius: 10px !important; object-fit: contain !important; }
+
+/* View toggle — centered pill */
+#cfy-toggle-row { justify-content: center !important; padding: 0 !important; }
+#cfy-toggle-row > .wrap { justify-content: center !important; }
+#cfy-toggle {
+    background: var(--surface) !important; border: 1px solid var(--border) !important;
+    border-radius: 999px !important; padding: 3px !important; width: auto !important;
+}
+#cfy-toggle .wrap { display: flex !important; gap: 2px !important; }
+#cfy-toggle label {
+    padding: 0.28rem 1.1rem !important; border-radius: 999px !important;
+    font-size: 0.76rem !important; font-weight: 600 !important;
+    color: var(--muted) !important; cursor: pointer !important;
+    transition: background 0.15s, color 0.15s !important;
+    border: none !important; background: transparent !important;
+}
+#cfy-toggle label:has(input:checked) { background: var(--accent) !important; color: white !important; }
+#cfy-toggle input[type="radio"] { display: none !important; }
+
+/* Status line */
 .cfy-status {
-    display: flex; align-items: center; gap: 0.6rem;
-    padding: 0.4rem 0; min-height: 2rem;
+    display: flex; align-items: center; gap: 0.55rem;
+    min-height: 1.6rem; padding: 0.1rem 0;
     font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
-    font-size: 0.78rem; color: var(--text-muted);
+    font-size: 0.74rem; color: var(--muted);
 }
-.cfy-dot {
-    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-}
-.cfy-progress-wrap { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.cfy-progress-label { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); }
+.cfy-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.cfy-progress-wrap { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.cfy-progress-label { display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--muted); }
 .cfy-progress-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
 .cfy-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.08s linear; }
 @keyframes dot-pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.3; transform: scale(0.7); }
+    50%       { opacity: 0.3; transform: scale(0.7); }
 }
 
-/* ── Result image ────────────────────────────────────────── */
-#cfy-result { border-radius: 12px !important; overflow: hidden !important; }
-#cfy-result img { border-radius: 10px !important; }
+/* Bottom input bar */
+#cfy-input-row {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    padding: 0.75rem !important; gap: 0.75rem !important;
+}
+#cfy-input-row > .wrap { align-items: stretch !important; }
 
-/* ── Generate button ─────────────────────────────────────── */
+/* Text inputs */
+.gradio-container textarea, .gradio-container input[type="text"],
+.gradio-container input[type="number"] {
+    background: var(--surface-2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important; font-size: 0.875rem !important;
+}
+.gradio-container textarea::placeholder,
+.gradio-container input::placeholder { color: var(--muted) !important; }
+.gradio-container textarea:focus, .gradio-container input:focus {
+    border-color: var(--accent) !important; outline: none !important;
+    box-shadow: 0 0 0 2px var(--accent-dim) !important;
+}
+
+/* Photo upload thumb */
+.cfy-upload {
+    border: 2px dashed var(--border) !important; border-radius: 8px !important;
+    background: var(--surface-2) !important; transition: border-color 0.2s !important;
+}
+.cfy-upload:hover { border-color: var(--accent) !important; }
+
+/* Generate button */
 #cfy-btn button {
     background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%) !important;
-    color: white !important; border: none !important;
-    border-radius: 12px !important;
-    font-size: 1rem !important; font-weight: 700 !important;
-    height: 52px !important; width: 100% !important;
-    letter-spacing: 0.03em !important;
-    box-shadow: 0 4px 20px rgba(124,58,237,0.35) !important;
+    color: white !important; border: none !important; border-radius: 10px !important;
+    font-size: 0.95rem !important; font-weight: 700 !important;
+    height: 46px !important; width: 100% !important; letter-spacing: 0.02em !important;
+    box-shadow: 0 4px 16px rgba(124,58,237,0.3) !important;
     transition: opacity 0.15s, transform 0.12s !important;
 }
 #cfy-btn button:hover  { opacity: 0.88 !important; transform: translateY(-1px) !important; }
@@ -413,62 +438,35 @@ footer { display: none !important; }
 # ── Interface ─────────────────────────────────────────────────────────────────
 with gr.Blocks(title='Cartoonify') as demo:
 
-    # ── Header ──────────────────────────────────────────────────────────────
-    gr.HTML('''
-        <div id="cfy-header">
-            <span class="cfy-title">&#127912; Cartoonify</span>
-            <span class="cfy-subtitle">Voice up. Turn your story into a satirical illustration.</span>
-            <div><span class="cfy-badge">UI Preview — no GPU</span></div>
-        </div>
-    ''')
+    original_state = gr.State(None)
+    result_state   = gr.State(None)
 
-    # ── Mode nav (tab row above both columns) ────────────────────────────────
-    with gr.Row(elem_id='cfy-mode-nav-row'):
-        mode_selector = gr.Radio(
-            choices=['Reimagine', 'Scene', 'Portrait'],
-            value=DEFAULT_MODE,
-            label='',
-            elem_id='cfy-mode-nav',
-        )
+    # ── Sidebar | Canvas ─────────────────────────────────────────────────────
+    with gr.Row(elem_id='cfy-app', equal_height=False):
 
-    # ── Main two-column layout ───────────────────────────────────────────────
-    with gr.Row(equal_height=False):
+        # ── LEFT SIDEBAR ─────────────────────────────────────────────────────
+        with gr.Column(scale=2, min_width=268, elem_id='cfy-sidebar'):
 
-        # ── Left column — Inputs ─────────────────────────────────────────────
-        with gr.Column(scale=5, min_width=340, elem_id='cfy-left'):
+            gr.HTML('<span class="cfy-logo">&#127912; Cartoonify'
+                    '<span class="cfy-badge">UI Preview</span></span>')
 
-            gr.HTML('<div class="cfy-label"><span class="cfy-step">1</span>What\'s the story?</div>')
-            story_input = gr.Textbox(
-                label='', lines=5, max_lines=10,
-                placeholder=(
-                    'A politician hands out empty promises while people queue for food…\n'
-                    'A general behind a desk of medals while tiny soldiers march across a map below…'
-                ),
+            gr.HTML('<span class="cfy-section-label">Mode</span>')
+            mode_selector = gr.Radio(
+                choices=['Reimagine', 'Scene', 'Portrait'],
+                value=DEFAULT_MODE, label='', elem_id='cfy-mode-nav',
             )
-
-            gr.HTML('<div class="cfy-label"><span class="cfy-step">2</span>Upload a photo</div>')
-            img_input = gr.Image(
-                label='', type='numpy', height=210,
-                elem_classes=['cfy-upload'],
-                sources=['upload', 'clipboard'],
-            )
-
-            # Mode description (updates on tab switch)
             mode_desc = gr.Markdown(
                 value=MODE_DESCRIPTIONS[DEFAULT_MODE],
                 elem_id='cfy-mode-desc',
             )
 
-            gr.HTML('<div class="cfy-label" style="margin-top:1.25rem">Settings</div>')
-
-            # Wild mode toggle
+            gr.HTML('<span class="cfy-section-label">Options</span>')
             wild_toggle = gr.Checkbox(
                 value=False,
-                label='⚡ Wild — Gemini tunes parameters for maximum satirical impact',
+                label='⚡ Wild — Gemini tunes for max satire',
                 elem_id='cfy-wild',
             )
 
-            # Fine-tune accordion (conditional sliders per mode)
             with gr.Accordion('Fine-tune', open=False):
                 guidance_slider = gr.Slider(
                     minimum=1.0, maximum=10.0,
@@ -512,30 +510,62 @@ with gr.Blocks(title='Cartoonify') as demo:
                         lines=3, max_lines=6, value='',
                     )
 
-        # ── Right column — Output ─────────────────────────────────────────────
-        with gr.Column(scale=6, min_width=480, elem_id='cfy-right'):
+        # ── CANVAS + INPUT ────────────────────────────────────────────────────
+        with gr.Column(scale=7, elem_id='cfy-canvas-area'):
 
-            result_output = gr.Image(
-                label='', type='pil', height=520,
-                interactive=False, elem_id='cfy-result',
+            # Main canvas — shows uploaded photo, then cartoon result
+            canvas_display = gr.Image(
+                label='', type='pil', interactive=False,
+                elem_id='cfy-canvas', height=490,
             )
+
+            # Original / Cartoon toggle (hidden until generation completes)
+            with gr.Row(elem_id='cfy-toggle-row'):
+                view_toggle = gr.Radio(
+                    choices=['Original', 'Cartoon'],
+                    value='Cartoon', label='',
+                    visible=False, elem_id='cfy-toggle',
+                )
 
             status_output = gr.HTML(value=_STATUS_IDLE)
 
+            # Bottom bar: story text (left) + photo upload thumb (right)
+            with gr.Row(elem_id='cfy-input-row', equal_height=True):
+                with gr.Column(scale=5):
+                    story_input = gr.Textbox(
+                        label='', lines=3, max_lines=6,
+                        placeholder=(
+                            'Describe your story or what to change…\n'
+                            'e.g. A politician handing out empty promises while people queue for food'
+                        ),
+                    )
+                with gr.Column(scale=2, min_width=130):
+                    img_input = gr.Image(
+                        label='Photo', type='numpy', height=104,
+                        elem_classes=['cfy-upload'],
+                        sources=['upload', 'clipboard'],
+                    )
+
             generate_btn = gr.Button(
-                '\U0001f3a8  Cartoonify  →',
-                variant='primary',
-                elem_id='cfy-btn',
+                '&#127912;  Cartoonify  →',
+                variant='primary', elem_id='cfy-btn',
             )
 
     # ── Event wiring ──────────────────────────────────────────────────────────
+
     mode_selector.change(
-        fn=update_mode,
-        inputs=[mode_selector],
+        fn=update_mode, inputs=[mode_selector],
         outputs=[mode_desc, guidance_slider, cn_scale_slider,
                  cn_end_slider, canny_low_slider, canny_high_slider],
     )
 
+    # Upload → show on canvas, store as original, clear prior result + toggle
+    img_input.change(
+        fn=on_image_upload, inputs=[img_input],
+        outputs=[canvas_display, original_state, view_toggle, result_state],
+    )
+
+    # Generate → stream updates to canvas/status/sliders; reveal toggle at end
     generate_btn.click(
         fn=cartoonify,
         inputs=[
@@ -545,12 +575,19 @@ with gr.Blocks(title='Cartoonify') as demo:
             seed_input, prompt_input,
         ],
         outputs=[
-            result_output, status_output,
+            canvas_display, status_output, result_state, view_toggle,
             guidance_slider, steps_slider,
             cn_scale_slider, cn_end_slider,
             canny_low_slider, canny_high_slider,
         ],
         api_name='cartoonify',
+    )
+
+    # Toggle → swap canvas between stored original and result
+    view_toggle.change(
+        fn=toggle_view,
+        inputs=[view_toggle, original_state, result_state],
+        outputs=[canvas_display],
     )
 
 
