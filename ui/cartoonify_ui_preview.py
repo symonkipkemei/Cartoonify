@@ -96,9 +96,13 @@ _STATUS_IDLE = _status('Upload a photo, describe your story, then hit Cartoonify
 # ── Image upload → show on canvas, reset result ───────────────────────────────
 def on_image_upload(image):
     if image is None:
-        return gr.update(value=None), None, gr.update(visible=False), None
+        # show placeholder, hide canvas
+        return (gr.update(visible=True), gr.update(value=None, visible=False),
+                None, gr.update(visible=False), None)
     pil = Image.fromarray(image) if isinstance(image, np.ndarray) else image
-    return gr.update(value=pil), pil, gr.update(visible=False), None
+    # hide placeholder, show canvas with image
+    return (gr.update(visible=False), gr.update(value=pil, visible=True),
+            pil, gr.update(visible=False), None)
 
 
 # ── Toggle between original and cartoon ───────────────────────────────────────
@@ -216,6 +220,46 @@ def update_mode(mode):
     )
 
 
+# ── Canvas placeholder (shown when no image is loaded) ────────────────────────
+CANVAS_PLACEHOLDER = '''
+<div class="cfy-empty">
+    <div class="cfy-empty-icon">&#9998;</div>
+    <div class="cfy-ticker-outer">
+        <div class="cfy-ticker-inner">
+            <div class="cfy-quote">
+                <p>&ldquo;Satire is the weapon of the powerless against the powerful.&rdquo;</p>
+                <span>&mdash; Molly Ivins</span>
+            </div>
+            <div class="cfy-quote">
+                <p>&ldquo;Comedy is simply a funny way of being serious.&rdquo;</p>
+                <span>&mdash; Peter Ustinov</span>
+            </div>
+            <div class="cfy-quote">
+                <p>&ldquo;Laughter is the shortest distance between two people.&rdquo;</p>
+                <span>&mdash; Victor Borge</span>
+            </div>
+            <div class="cfy-quote">
+                <p>&ldquo;A caricature puts the face of a joke on the body of a truth.&rdquo;</p>
+                <span>&mdash; Joseph Conrad</span>
+            </div>
+            <div class="cfy-quote">
+                <p>&ldquo;The purpose of satire is to strip away the veneer of comforting illusion.&rdquo;</p>
+                <span>&mdash; Michael Foot</span>
+            </div>
+            <div class="cfy-quote">
+                <p>&ldquo;Through laughter we hold up a mirror to the absurd.&rdquo;</p>
+                <span>&mdash; Cartoonify</span>
+            </div>
+            <div class="cfy-quote">
+                <p>&ldquo;Satire is the weapon of the powerless against the powerful.&rdquo;</p>
+                <span>&mdash; Molly Ivins</span>
+            </div>
+        </div>
+    </div>
+    <p class="cfy-empty-hint">Upload a photo below to begin</p>
+</div>
+'''
+
 # ── CSS ───────────────────────────────────────────────────────────────────────
 CSS = '''
 /* ── Tokens ──────────────────────────────────────────────── */
@@ -265,14 +309,6 @@ CSS = '''
     font-size: 1.25rem; font-weight: 900; letter-spacing: -0.8px;
     color: var(--text); padding-bottom: 0.9rem;
     border-bottom: 1px solid var(--border); margin-bottom: 0.75rem;
-}
-.cfy-badge {
-    display: inline-block; margin-left: 0.4rem;
-    background: var(--amber-dim); color: var(--amber);
-    border: 1px solid rgba(251,191,36,0.25);
-    font-size: 0.58rem; font-weight: 800; padding: 0.1rem 0.4rem;
-    border-radius: 20px; letter-spacing: 0.08em; text-transform: uppercase;
-    vertical-align: middle;
 }
 
 .cfy-section-label {
@@ -357,7 +393,61 @@ CSS = '''
 }
 #cfy-canvas-area > .wrap { display: flex; flex-direction: column; gap: 0.65rem; }
 
-/* Canvas */
+/* Empty canvas placeholder */
+#cfy-canvas-empty {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    min-height: 490px !important;
+    display: flex !important; align-items: center !important; justify-content: center !important;
+    padding: 0 !important;
+}
+.cfy-empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 1.75rem;
+    padding: 2.5rem; width: 100%; height: 100%;
+}
+.cfy-empty-icon {
+    font-size: 2.4rem; opacity: 0.18; user-select: none;
+}
+/* Ticker */
+.cfy-ticker-outer {
+    width: 100%; max-width: 560px; height: 5.5rem;
+    overflow: hidden; position: relative;
+    mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent);
+}
+.cfy-ticker-inner {
+    animation: ticker-scroll 28s linear infinite;
+}
+.cfy-quote {
+    height: 5.5rem;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0.35rem; padding: 0 1rem;
+    text-align: center;
+}
+.cfy-quote p {
+    font-size: 0.9rem; color: var(--text);
+    font-weight: 500; line-height: 1.5;
+    margin: 0 !important;
+    opacity: 0.75;
+}
+.cfy-quote span {
+    font-size: 0.72rem; color: var(--muted);
+    letter-spacing: 0.04em;
+}
+@keyframes ticker-scroll {
+    0%   { transform: translateY(0); }
+    100% { transform: translateY(calc(-5.5rem * 6)); }
+}
+.cfy-empty-hint {
+    font-size: 0.72rem; color: #3a3a42;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    margin: 0;
+}
+
+/* Canvas image */
 #cfy-canvas {
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
@@ -475,8 +565,7 @@ with gr.Blocks(title='Cartoonify') as demo:
         # ── LEFT SIDEBAR ─────────────────────────────────────────────────────
         with gr.Column(scale=2, min_width=268, elem_id='cfy-sidebar'):
 
-            gr.HTML('<span class="cfy-logo">&#127912; Cartoonify'
-                    '<span class="cfy-badge">UI Preview</span></span>')
+            gr.HTML('<span class="cfy-logo">&#127912; Cartoonify</span>')
 
             gr.HTML('<span class="cfy-section-label">Mode</span>')
             mode_selector = gr.Radio(
@@ -542,10 +631,18 @@ with gr.Blocks(title='Cartoonify') as demo:
         # ── CANVAS + INPUT ────────────────────────────────────────────────────
         with gr.Column(scale=7, elem_id='cfy-canvas-area'):
 
+            # Placeholder — animated quotes, hidden once image is loaded
+            canvas_placeholder = gr.HTML(
+                value=CANVAS_PLACEHOLDER,
+                elem_id='cfy-canvas-empty',
+                visible=True,
+            )
+
             # Main canvas — shows uploaded photo, then cartoon result
             canvas_display = gr.Image(
                 label='', type='pil', interactive=False,
                 elem_id='cfy-canvas', height=490,
+                visible=False,
             )
 
             # Original / Cartoon toggle (hidden until generation completes)
@@ -588,10 +685,10 @@ with gr.Blocks(title='Cartoonify') as demo:
                  cn_end_slider, canny_low_slider, canny_high_slider],
     )
 
-    # Upload → show on canvas, store as original, clear prior result + toggle
+    # Upload → swap placeholder↔canvas, store original, clear toggle+result
     img_input.change(
         fn=on_image_upload, inputs=[img_input],
-        outputs=[canvas_display, original_state, view_toggle, result_state],
+        outputs=[canvas_placeholder, canvas_display, original_state, view_toggle, result_state],
     )
 
     # Generate → stream updates to canvas/status/sliders; reveal toggle at end
