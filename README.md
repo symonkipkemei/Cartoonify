@@ -44,31 +44,28 @@ Notebook `05` combines all three modes in a single interface — recommended sta
 ```
 Cartoonify/
 │
-├── data/
-│   ├── images/              # 17 editorial cartoons — training reference (CTN001–CTN0017)
-│   └── captions/            # Cartoonify_FLUX_Captions.xlsx — structured prompt metadata
-│
 ├── notebooks/
-│   ├── cartoonify/          # Gradio interface notebooks
-│   │   ├── 01_Cartoonify_Gradio_Depth.ipynb        # Depth ControlNet — prompt only
-│   │   ├── 02_Cartoonify_Gradio_Depth_Story.ipynb  # Depth ControlNet + Gemini story layer
-│   │   ├── 03_Cartoonify_Gradio_Kontext.ipynb      # FLUX Kontext — semantic recomposition
-│   │   ├── 04_Cartoonify_Gradio_Canny.ipynb        # Canny ControlNet — edge-based
-│   │   └── 05_Cartoonify_Gradio_Unified.ipynb      # Unified — all three modes, one interface
+│   ├── cartoonify/
+│   │   ├── 05_Cartoonify_Gradio_Unified.ipynb      # ← start here — all three modes
+│   │   └── archive/                                 # 01–04 kept for reference
 │   │
-│   └── lora-training/       # LoRA preparation and training
-│       ├── 01_FLUX_LoRA_Preparation.ipynb
-│       └── 02_FLUX_LoRA_Train.ipynb
+│   └── lora-training/
+│       ├── _template/                               # copy to add a new cartoonist LoRA
+│       └── gado-cartoon/                            # first cartoonist instance
+│           ├── 01_FLUX_LoRA_Preparation.ipynb
+│           ├── 02_FLUX_LoRA_Train.ipynb
+│           ├── Cartoonify_FLUX_Captions.xlsx
+│           └── data/
+│               ├── images/   # CTN001–CTN0087 source cartoons
+│               └── captions/ # structured caption metadata
 │
-├── __docs__/                # Project documentation
-│   ├── Cartoonify-Gradio-Architecture.md           # Unified system architecture
-│   ├── Cartoonify-Depth ControlNet-Workflow.md     # Depth mode pipeline walkthrough
-│   ├── Cartoonify-Kontext-Image-Workflow.md        # Kontext mode pipeline walkthrough
-│   └── Cartoonify-Canny ControlNet Workflow.md     # Canny mode pipeline walkthrough
+├── projects/                                        # content runs
+│   └── africa-iconic-buildings/                     # 10 African buildings demo set
 │
-└── __sample__/              # Reference material
-    ├── google_colab/        # Upstream reference notebooks
-    └── frontend/            # React/TypeScript UI scaffold (future use)
+├── __docs__/                # Pipeline architecture and workflow docs
+│
+└── __sample__/              # Reference material (gitignored)
+    └── google_colab/        # Upstream reference notebooks
 ```
 
 ---
@@ -133,12 +130,12 @@ Notebook `05` auto-adjusts these defaults when the rendering style is changed in
 | Notebook | Mode | Description |
 |---|---|---|
 | [05_Cartoonify_Gradio_Unified.ipynb](notebooks/cartoonify/05_Cartoonify_Gradio_Unified.ipynb) | **All three** | **Recommended** — story-first UI, three rendering styles, dynamic pipeline loading |
-| [01_Cartoonify_Gradio_Depth.ipynb](notebooks/cartoonify/01_Cartoonify_Gradio_Depth.ipynb) | Depth | Baseline — manual prompt, no Gemini |
-| [02_Cartoonify_Gradio_Depth_Story.ipynb](notebooks/cartoonify/02_Cartoonify_Gradio_Depth_Story.ipynb) | Depth + Gemini | Story → Gemini → structured prompt → depth ControlNet |
-| [03_Cartoonify_Gradio_Kontext.ipynb](notebooks/cartoonify/03_Cartoonify_Gradio_Kontext.ipynb) | Kontext | Full image content → FluxKontextPipeline |
-| [04_Cartoonify_Gradio_Canny.ipynb](notebooks/cartoonify/04_Cartoonify_Gradio_Canny.ipynb) | Canny | cv2.Canny edges → FluxControlNetPipeline |
-| [01_FLUX_LoRA_Preparation.ipynb](notebooks/lora-training/01_FLUX_LoRA_Preparation.ipynb) | Training | Dataset preparation and caption structuring |
-| [02_FLUX_LoRA_Train.ipynb](notebooks/lora-training/02_FLUX_LoRA_Train.ipynb) | Training | LoRA fine-tuning |
+| [archive/01_Cartoonify_Gradio_Depth.ipynb](notebooks/cartoonify/archive/01_Cartoonify_Gradio_Depth.ipynb) | Depth | Baseline — manual prompt, no Gemini *(archived)* |
+| [archive/02_Cartoonify_Gradio_Depth_Story.ipynb](notebooks/cartoonify/archive/02_Cartoonify_Gradio_Depth_Story.ipynb) | Depth + Gemini | Story → Gemini → structured prompt → depth ControlNet *(archived)* |
+| [archive/03_Cartoonify_Gradio_Kontext.ipynb](notebooks/cartoonify/archive/03_Cartoonify_Gradio_Kontext.ipynb) | Kontext | Full image content → FluxKontextPipeline *(archived)* |
+| [archive/04_Cartoonify_Gradio_Canny.ipynb](notebooks/cartoonify/archive/04_Cartoonify_Gradio_Canny.ipynb) | Canny | cv2.Canny edges → FluxControlNetPipeline *(archived)* |
+| [01_FLUX_LoRA_Preparation.ipynb](notebooks/lora-training/gado-cartoon/01_FLUX_LoRA_Preparation.ipynb) | Training | Dataset preparation and caption structuring |
+| [02_FLUX_LoRA_Train.ipynb](notebooks/lora-training/gado-cartoon/02_FLUX_LoRA_Train.ipynb) | Training | LoRA fine-tuning |
 
 ---
 
@@ -154,3 +151,9 @@ Notebook `05` auto-adjusts these defaults when the rendering style is changed in
 - [Depth ControlNet Workflow](__docs__/Cartoonify-Depth%20ControlNet-Workflow.md) — notebooks 01/02 — Depth-Anything-V2 → FluxControlNetPipeline
 - [Kontext Workflow](__docs__/Cartoonify-Kontext-Image-Workflow.md) — notebook 03 — full image content → FluxKontextPipeline
 - [Canny ControlNet Workflow](__docs__/Cartoonify-Canny%20ControlNet%20Workflow.md) — notebook 04 — cv2.Canny edges → FluxControlNetPipeline
+
+---
+
+## Published work
+
+- [Cartoonify: Buildings as Political Objects](https://blog.iaac.net/cartoonify-buildings-as-political-objects/) — 10 iconic African buildings cartoonified using the pipeline, IAAC Blog, 2025
